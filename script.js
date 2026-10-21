@@ -342,7 +342,7 @@ async function sheetSync(all){
       }
     }while(syncAgain);
   }catch(e){lastSheetErr=(e&&e.message)||"falha de conexão.";}
-  syncing=false;paintSync();return sent;
+  syncing=false;paintSync();if(sent&&$("v-painel")&&!$("v-painel").hidden)setTimeout(()=>carregarPainel(),1500);return sent;
 }
 async function testSheet(){const bt=$("g-test");bt.disabled=true;bt.textContent="Testando…";
   try{const r=await fetch(SHEET_URL+"?t="+Date.now(),{cache:"no-store"});const txt=await r.text();let j=null;try{j=JSON.parse(txt);}catch(e){}
@@ -418,9 +418,11 @@ $("b-reset").onclick=async()=>{if(!confirm("Voltar às bases originais do formul
 const QUADRO_DEF=[["10003193","2,3"],["10003615","4"],["10001781","5,6,7"],["10003748","8,9"],["10003942","10,11"],["10003787","11,12"],["10003850","16,17"],["10003995","18,19"],["10002347","20,22"],["10003643","23"],["10003932","24"],["10003928","25,26"],["10003902","27,28"],["10003936","29,30"],["10004015","31,32"],["10003930","34,35"],["10003961","36,37"],["10003639","38,39,40"],["10003413","41,42"],["10003925","43,44"],["10003316","45,46"]];
 const parseRuas=s=>String(s||"").split(/[^0-9]+/).filter(Boolean).map(x=>String(+x));
 let QUADRO=store.get("audcd_quadro",null)||QUADRO_DEF.map(([m,r])=>({mat:m,ruas:parseRuas(r)}));
+let QUADRO_PLANILHA=false;
+function aplicarQuadroPlanilha(q){if(!Array.isArray(q)||!q.length)return;const L=q.map(x=>({mat:String(x[0]||"").trim(),nome:String(x[1]||"").trim(),ruas:parseRuas(x[3])})).filter(x=>x.mat&&x.ruas.length);if(!L.length)return;QUADRO=L;QUADRO_PLANILHA=true;store.set("audcd_quadro",QUADRO);}
 function saveQuadro(){store.set("audcd_quadro",QUADRO);}
 function repsDaRua(rua){rua=String(rua);return QUADRO.filter(q=>q.ruas.includes(rua)).map(q=>q.mat);}
-const nomeC=m=>cIdx.has(m)?C.nome[cIdx.get(m)]:m;
+const nomeC=m=>{if(cIdx.has(m))return C.nome[cIdx.get(m)];const q=QUADRO.find(x=>x.mat===m);return q&&q.nome?q.nome:m;};
 const curto=n=>{const p=String(n).trim().split(/\s+/);return p.length>1?p[0]+" "+p[p.length-1]:String(n);};
 let RUA_TOT=null;
 function ruaTotMap(){if(RUA_TOT&&RUA_TOT._n===E.id.length)return RUA_TOT;const m={};E.pt.forEach((a,i)=>{if(E.cod[i]||true)m[a[0]]=(m[a[0]]||0)+1;});Object.defineProperty(m,"_n",{value:E.id.length,enumerable:false});RUA_TOT=m;return m;}
@@ -432,8 +434,7 @@ function normRec(o){const end=fmtAddr(o.Endereco||"");const rua=unz(o.Rua)||end.
   return {id:String(o.ID_Auditoria||""),ts:o.ts?+o.ts:pts(o.DataHora,pts(o.Recebido_Em)),rua:String(rua),end,nc:pbool(o.Possui_NC),sess:String(o.ID_Sessao||""),
     mat:String(o.Matricula_Colaborador_NC||""),val:pnum(o.Valor_Divergencia),qtd:pnum(o.Qtd_Divergencia_Un),aud:o.Nome_Auditor||""};}
 let PAINEL_ROWS=null,PAINEL_INFO="",painelMode="mes",ruaSel=null,painelBusy=false;
-function painelRecs(){const m=new Map();(PAINEL_ROWS||[]).forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});
-  allRecs().forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});return [...m.values()];}
+function painelRecs(){const m=new Map();(PAINEL_ROWS||[]).forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});return [...m.values()];}
 function ciclos(recs){const by={};
   recs.forEach(r=>{if(!r.rua)return;const d=new Date(r.ts);const day=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());const k=r.rua+"|"+(r.sess||day);(by[k]=by[k]||{rua:r.rua,recs:[]}).recs.push(r);});
   const T=ruaTotMap(),pr={};
@@ -480,7 +481,9 @@ function renderPainel(){
   const qg=tot?1-nc/tot:null,per=porPeriodo(pr,painelMode),prevq=prever(per.map(p=>p.q));
   const lastP=per[per.length-1],prevP=per[per.length-2];
   const semRep=Object.keys(T).filter(r=>!repsDaRua(r).length).sort((a,b)=>a-b);
-  let h='<div class="src"><span id="pn-info">'+esc(PAINEL_INFO||"Dados deste aparelho.")+'</span><button type="button" class="btn sm" id="pn-upd">Atualizar</button></div>';
+  let h='<div class="src"><span id="pn-info">'+esc(PAINEL_INFO||"Carregando a base do Google Sheets…")+'</span><button type="button" class="btn sm" id="pn-upd">Atualizar</button></div>';
+  const pend=sheetPending();if(pend)h+='<p class="note" style="margin:-4px 0 10px">'+pend+' lançamento'+(pend>1?'s':'')+' deste aparelho ainda não chegaram à planilha e entram no painel assim que forem enviados.</p>';
+  if(!PAINEL_ROWS){box.innerHTML=h+'<div class="empty">O painel é alimentado pela base do Google Sheets.<br>'+(navigator.onLine?'Toque em Atualizar para carregar.':'Conecte-se à internet para carregar a primeira vez.')+'</div>';$("pn-upd").onclick=()=>carregarPainel(true);return;}
   h+='<div class="kpis"><div class="kpi"><b class="'+qClass(qg)+'-t">'+pct(qg)+'</b><span>qualidade geral (último ciclo de cada rua)</span></div>'+
      '<div class="kpi"><b>'+aud+' / '+ruasBase+'</b><span>ruas auditadas</span></div>'+
      '<div class="kpi"><b>'+nc+'</b><span>endereços com NC (último ciclo)</span></div>'+
@@ -503,21 +506,27 @@ function renderPainel(){
         '<div class="sm">'+(x.q==null?'Sem auditoria ainda':x.nc+' NC · '+BRL.format(x.val)+(d!=null?' · '+seta(d)+' '+pp(d):''))+'</div></div><div class="qv '+qClass(x.q)+'-t">'+pct(x.q)+'</div></div>';}).join("")+
      (semRep.length?'<p class="note">Ruas sem repositor no quadro: '+semRep.join(", ")+'.</p>':'')+'</div>';
   // quadro
+  if(QUADRO_PLANILHA){h+='<details class="block" id="pn-quadro"><summary style="cursor:pointer;font-weight:600;color:var(--brand)">Quadro de repositores ('+QUADRO.length+')</summary><p class="note">Vem da aba <b>Quadro_Repositores</b> da planilha. Para mudar ruas ou repositores, edite lá e toque em Atualizar.</p>'+
+     QUADRO.map(q=>'<div class="qe" style="grid-template-columns:1fr auto"><div><b>'+esc(curto(nomeC(q.mat)))+'</b><div style="color:var(--muted);font-size:.78rem">'+esc(q.mat)+'</div></div><div>Ruas '+esc(q.ruas.join(", "))+'</div></div>').join("")+'</details>';
+    const wo=$("pn-quadro")&&$("pn-quadro").open;box.innerHTML=h;if(wo)$("pn-quadro").open=true;bindPainel(box,pr,T);return;}
   h+='<details class="block" id="pn-quadro"><summary style="cursor:pointer;font-weight:600;color:var(--brand)">Quadro de repositores ('+QUADRO.length+')</summary><p class="note">Ruas de cada repositor, separadas por vírgula. Usado no ranking e para preencher o repositor ao iniciar uma rua.</p>'+
      QUADRO.map((q,i)=>'<div class="qe"><div><b>'+esc(curto(nomeC(q.mat)))+'</b><div class="sm" style="color:var(--muted);font-size:.78rem">'+esc(q.mat)+'</div></div><input class="in" data-qi="'+i+'" value="'+esc(q.ruas.join(", "))+'" inputmode="numeric" aria-label="Ruas de '+esc(nomeC(q.mat))+'"><button type="button" class="btn sm" data-qx="'+i+'" aria-label="Remover">×</button></div>').join("")+
      '<div class="field"><label>Adicionar repositor</label><div id="qa-pick"></div><input class="in" id="qa-ruas" placeholder="Ruas, ex.: 13, 14" inputmode="numeric" style="margin-top:6px"><button type="button" class="btn full" id="qa-add" style="margin-top:6px">Adicionar ao quadro</button></div>'+
      '<button type="button" class="btn full" id="qa-reset" style="margin-top:8px">Restaurar quadro padrão</button></details>';
   const wasOpen=$("pn-quadro")&&$("pn-quadro").open;
   box.innerHTML=h;if(wasOpen)$("pn-quadro").open=true;
-  box.querySelectorAll(".rq").forEach(b=>b.onclick=()=>{ruaSel=ruaSel===b.dataset.r?null:b.dataset.r;renderPainel();if(ruaSel)$("pn-rua").scrollIntoView({block:"nearest",behavior:"smooth"});});
-  box.querySelectorAll("[data-pm]").forEach(b=>b.onclick=()=>{painelMode=b.dataset.pm;renderPainel();});
-  $("pn-upd").onclick=()=>carregarPainel(true);
+  bindPainel(box,pr,T);
   box.querySelectorAll("[data-qi]").forEach(inp=>inp.onchange=()=>{QUADRO[+inp.dataset.qi].ruas=parseRuas(inp.value);saveQuadro();renderPainel();toast("Quadro atualizado.");});
   box.querySelectorAll("[data-qx]").forEach(b=>b.onclick=()=>{const q=QUADRO[+b.dataset.qx];if(!confirm("Remover "+curto(nomeC(q.mat))+" do quadro?"))return;QUADRO.splice(+b.dataset.qx,1);saveQuadro();renderPainel();});
   const qp=picker($("qa-pick"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab});
   $("qa-add").onclick=()=>{if(qp.value==null){toast("Escolha o colaborador.");return;}const m=C.mat[qp.value],ru=parseRuas($("qa-ruas").value);if(!ru.length){toast("Informe as ruas.");return;}
     const ex=QUADRO.find(q=>q.mat===m);if(ex)ex.ruas=[...new Set(ex.ruas.concat(ru))];else QUADRO.push({mat:m,ruas:ru});saveQuadro();renderPainel();toast("Repositor adicionado ao quadro.");};
   $("qa-reset").onclick=()=>{if(!confirm("Voltar ao quadro padrão de repositores?"))return;QUADRO=QUADRO_DEF.map(([m,r])=>({mat:m,ruas:parseRuas(r)}));saveQuadro();renderPainel();};
+}
+function bindPainel(box,pr,T){
+  box.querySelectorAll(".rq").forEach(b=>b.onclick=()=>{ruaSel=ruaSel===b.dataset.r?null:b.dataset.r;renderPainel();if(ruaSel)$("pn-rua").scrollIntoView({block:"nearest",behavior:"smooth"});});
+  box.querySelectorAll("[data-pm]").forEach(b=>b.onclick=()=>{painelMode=b.dataset.pm;renderPainel();});
+  $("pn-upd").onclick=()=>carregarPainel(true);
   // detalhe da rua
   if(ruaSel){const r=ruaSel,cs=pr[r]||[],reps=repsDaRua(r).map(m=>curto(nomeC(m))).join(" e ")||"sem repositor no quadro";const pv=prever(cs.map(c=>c.q));
     $("pn-rua").innerHTML='<div class="block" style="margin:12px 0 0;border-color:var(--brand)"><h3>Rua '+esc(r)+' <small>'+(T[r]||0)+' endereços na 8022</small></h3><p class="note" style="margin-top:0">Repositor: <b>'+esc(reps)+'</b></p>'+
@@ -527,18 +536,19 @@ function renderPainel(){
 }
 async function carregarPainel(manual){
   if(painelBusy)return;
-  if(!SHEET_URL||window.claude){PAINEL_INFO="Dados deste aparelho.";renderPainel();return;}
-  if(!navigator.onLine){PAINEL_INFO=PAINEL_ROWS?"Sem internet: mostrando a última cópia da planilha.":"Sem internet: mostrando dados deste aparelho.";renderPainel();return;}
+  if(!SHEET_URL||window.claude){PAINEL_INFO=window.claude?"Pelo link do Claude o painel não acessa a planilha. Use o site.":"Planilha não configurada.";renderPainel();return;}
+  if(!navigator.onLine){PAINEL_INFO=PAINEL_ROWS?"Sem internet: mostrando a última cópia da planilha.":"Sem internet.";renderPainel();return;}
   painelBusy=true;const inf=$("pn-info");if(inf)inf.textContent="Atualizando com a planilha…";
   try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=registros&t="+Date.now(),{cache:"no-store"});const j=await r.json();
-    if(j&&j.ok&&Array.isArray(j.registros)){PAINEL_ROWS=j.registros.map(row=>{const o={};j.colunas.forEach((c,i)=>o[c]=row[i]);return o;});
-      PAINEL_INFO="Planilha Google ("+PAINEL_ROWS.length+" lançamentos) · "+fmtDT(new Date()).slice(0,16);IDB.set("painel_cache",{rows:PAINEL_ROWS,info:PAINEL_INFO}).catch(()=>{});
+    if(j&&j.ok&&Array.isArray(j.registros)){PAINEL_ROWS=j.registros.map(row=>{const o={};j.colunas.forEach((c,i)=>o[c]=row[i]);return o;});aplicarQuadroPlanilha(j.quadro);
+      PAINEL_INFO="Planilha Google ("+PAINEL_ROWS.length+" lançamentos) · "+fmtDT(new Date()).slice(0,16);IDB.set("painel_cache",{rows:PAINEL_ROWS,info:PAINEL_INFO,quadro:j.quadro||null}).catch(()=>{});
       if(manual)toast("Painel atualizado com a planilha.");}
-    else PAINEL_INFO="Atualize o Apps Script (versão 4) para o painel somar todos os auditores. Mostrando dados deste aparelho.";
-  }catch(e){PAINEL_INFO=PAINEL_ROWS?"Sem conexão com a planilha: mostrando a última cópia.":"Sem conexão com a planilha: mostrando dados deste aparelho.";}
+    else PAINEL_INFO="O Apps Script precisa da versão 5 para alimentar o painel (veja as instruções).";
+  }catch(e){PAINEL_INFO=PAINEL_ROWS?"Sem conexão com a planilha: mostrando a última cópia.":"Sem conexão com a planilha.";}
   painelBusy=false;renderPainel();
 }
-IDB.get("painel_cache").then(c=>{if(c&&c.rows&&!PAINEL_ROWS){PAINEL_ROWS=c.rows;PAINEL_INFO="Última cópia da planilha: "+String(c.info||"").split("· ").pop();}}).catch(()=>{});
+IDB.get("painel_cache").then(c=>{if(c&&c.rows&&!PAINEL_ROWS){PAINEL_ROWS=c.rows;aplicarQuadroPlanilha(c.quadro);PAINEL_INFO="Última cópia da planilha: "+String(c.info||"").split("· ").pop();}}).catch(()=>{});
+setInterval(()=>{if(!$("v-painel").hidden&&navigator.onLine&&!document.hidden)carregarPainel();},120000);
 
 // modo offline (site)
 if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){

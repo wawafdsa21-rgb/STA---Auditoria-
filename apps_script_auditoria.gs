@@ -103,7 +103,7 @@ function doGet(e) {
   try {
     const ss = abrirPlanilha();
     if (e && e.parameter && e.parameter.acao === 'registros') return listarRegistros(ss);
-    return resposta({ ok: true, servico: 'Auditoria de Ruas', versao: 4, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria de Ruas', versao: 5, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -114,8 +114,9 @@ function listarRegistros(ss) {
   const campos = ['ID_Auditoria', 'DataHora', 'Nome_Auditor', 'Endereco', 'Rua', 'Possui_NC', 'Erro_Produto',
     'Prox_Vencimento', 'Sem_Saldo', 'Avaria', 'Qtd_Divergencia_Un', 'Valor_Divergencia',
     'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em'];
+  const quadro = lerQuadro(ss);
   const sh = ss.getSheetByName(ABA);
-  if (!sh || sh.getLastRow() < 2) return resposta({ ok: true, colunas: campos, registros: [] });
+  if (!sh || sh.getLastRow() < 2) return resposta({ ok: true, colunas: campos, registros: [], quadro: quadro });
   const dados = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
   const cab = dados[0].map(String);
   const idx = campos.map(function (c) { return cab.indexOf(c); });
@@ -129,7 +130,51 @@ function listarRegistros(ss) {
       return v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss') : v;
     }));
   }
-  return resposta({ ok: true, colunas: campos, registros: regs });
+  return resposta({ ok: true, colunas: campos, registros: regs, quadro: quadro });
+}
+
+/* ---------- Quadro de repositores (aba Quadro_Repositores) ---------- */
+const ABA_QUADRO = 'Quadro_Repositores';
+const QUADRO_PADRAO = [
+  ['10003926', 'FABIANNE MATURANO DE LUCENA ALVES', 'SUPORTE', ''],
+  ['10003936', 'GRAZIELA PEREIRA DA SILVA', 'REPOSITOR', '29, 30'],
+  ['10003932', 'ALICE KAUANE PEREIRA SILVA', 'REPOSITOR', '24'],
+  ['10003925', 'ANA CAROLINA DE ALCANTARA FERREIRA', 'REPOSITOR', '43, 44'],
+  ['10003615', 'CARLOS ANTONIO DOS SANTOS', 'REPOSITOR', '4'],
+  ['10003639', 'CLEITON CARDOSO DA SILVA', 'REPOSITOR', '38, 39, 40'],
+  ['10002347', 'EDIO JOSE DE SOUZA', 'REPOSITOR', '20, 22'],
+  ['10003850', 'ESDRAS SOUZA ARAUJO', 'REPOSITOR', '16, 17'],
+  ['10003902', 'FRANCIMAR ABADE DA SILVA', 'REPOSITOR', '27, 28'],
+  ['10003413', 'GABRIEL FILLIPE DOS SANTOS FERREIRA', 'REPOSITOR', '41, 42'],
+  ['10003748', 'HALLYSON DE SOUSA DELMONDES', 'REPOSITOR', '8, 9'],
+  ['10003193', 'JOSE RODRIGUES DA SILVA FILHO', 'REPOSITOR', '2, 3'],
+  ['10003928', 'KETNEY CRISTINE ALVES DOS SANTOS', 'REPOSITOR', '25, 26'],
+  ['10001781', 'LEANDRO SOARES LOPES', 'REPOSITOR', '5, 6, 7'],
+  ['10003942', 'NAIARA GONCALVES DOS SANTOS', 'REPOSITOR', '10, 11'],
+  ['10003930', 'NATHAN ALVES DE OLIVEIRA', 'REPOSITOR', '34, 35'],
+  ['10003961', 'NICACIO GUILHERME DOS SANTOS', 'REPOSITOR', '36, 37'],
+  ['10003316', 'PAULO CESAR ALVES VIANA', 'REPOSITOR', '45, 46'],
+  ['10003643', 'TIAGO VITO PEREIRA MELO', 'REPOSITOR', '23'],
+  ['10003787', 'WAGNER HENRIQUE ALVES', 'REPOSITOR', '11, 12'],
+  ['10003993', 'FABIO NYCKOLAS FIGUEIREDO BOTERO', 'LIDER', ''],
+  ['10004015', 'CAIO GABRIEL ANDRADE DE HOLANDA', 'REPOSITOR', '31, 32'],
+  ['10003995', 'HELIANO HOLANDA E SILVA CASTRO', 'REPOSITOR', '18, 19'],
+  ['10002871', 'RONNY KENDSON RAMALHO SILVA', 'AUXILIAR', '']
+];
+
+/** Lê a aba Quadro_Repositores (cria com o quadro padrão se não existir). */
+function lerQuadro(ss) {
+  let sh = ss.getSheetByName(ABA_QUADRO);
+  if (!sh) {
+    sh = ss.insertSheet(ABA_QUADRO);
+    sh.getRange(1, 1, 1, 4).setValues([['Matricula', 'Nome', 'Funcao', 'Ruas']]).setFontWeight('bold');
+    sh.getRange(2, 1, QUADRO_PADRAO.length, 4).setNumberFormat('@').setValues(QUADRO_PADRAO);
+    sh.setFrozenRows(1);
+    sh.autoResizeColumns(1, 4);
+  }
+  if (sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getDisplayValues()
+    .filter(function (l) { return String(l[0]).trim(); });
 }
 
 function autorizar() {
