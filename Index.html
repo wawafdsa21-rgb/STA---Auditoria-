@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auditoria de Ruas – Santa Therezinha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <img id="hdr-logo" src="" alt="Santa Therezinha">
+  <button class="who" id="whoBtn" type="button" aria-label="Trocar auditor"><i class="dot" id="connDot"></i><span id="whoName">Identificar auditor</span></button>
+</header>
+<div class="band"><div class="band-in"><h1 id="band-t">Auditoria de ruas</h1><p id="band-p">Inicie a rua e lance os endereços em sequência.</p></div></div>
+
+<main>
+  <section class="view" id="v-ruas">
+    <div class="block sess" id="sess-box"></div>
+    <div class="block">
+      <div class="field" id="r-prod-f"><div class="lblrow"><label id="r-prod-l">Produto auditado</label><div class="mini" role="group" aria-label="Buscar por"><button type="button" data-m="prod" aria-pressed="true">Produto</button><button type="button" data-m="end" aria-pressed="false">Endereço</button></div></div><div id="r-prod"></div><div id="r-end" hidden></div></div>
+      <div id="r-rack"></div>
+      <div class="field" id="r-addr-f" hidden><label id="r-addr-l">Endereço auditado</label><div id="r-addr"></div><div class="hint" id="r-addr-h">Separe rua, prédio, nível e apto com ponto ou espaço. Ex.: 2.35.1.1. Endereço fora da 8022 também pode ser usado.</div></div>
+    </div>
+
+    <div class="block">
+      <h3>Ocorrências <small>toque para marcar</small></h3>
+      <div class="toggles">
+        <button type="button" class="tg" data-k="erro" aria-pressed="false"><i class="box"></i>Produto no lugar errado</button>
+        <button type="button" class="tg" data-k="venc" aria-pressed="false"><i class="box"></i>Próximo do vencimento</button>
+        <button type="button" class="tg" data-k="saldo" aria-pressed="false"><i class="box"></i>Sem saldo / furo</button>
+        <button type="button" class="tg" data-k="avaria" aria-pressed="false"><i class="box"></i>Avaria</button>
+      </div>
+      <div class="verdict ok" id="r-verdict">Endereço conforme</div>
+
+      <div id="r-nc" hidden>
+        <div class="field" id="r-rep-f"><label>Repositor da rua auditada</label><div id="r-rep"></div><div class="hint">A ocorrência fica registrada para este colaborador.</div></div>
+
+        <div class="field" id="r-qtd-f"><label for="r-qtd">Unidades encontradas</label>
+          <div class="stepper"><button type="button" data-step="-1" aria-label="Diminuir">−</button><input class="in" id="r-qtd" type="number" inputmode="numeric" min="0" step="1" value="0"><button type="button" data-step="1" aria-label="Aumentar">+</button></div>
+          <div class="hint" id="r-qtd-h"></div></div>
+        <div class="money" id="r-money"><span>Valor real da divergência<br><small id="r-money-calc">0 un × R$ 0,00</small></span><b id="r-valor">R$ 0,00</b></div>
+
+        <div class="sub" id="sub-venc" hidden>
+          <div class="field" id="r-venc-f"><label for="r-venc">Data de vencimento encontrada</label><input class="in" type="date" id="r-venc"></div>
+        </div>
+        <div class="sub" id="sub-avaria" hidden>
+          <div class="field" id="r-tipo-f"><label for="r-tipo">Tipo de avaria</label>
+            <select class="in" id="r-tipo"><option value="">Selecione</option><option>Embalagem rasgada</option><option>Amassado</option><option>Molhado</option><option>Vazamento</option><option>Violado</option><option>Outro</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="field" id="r-obs-f"><label for="r-obs">Observação</label><textarea class="in" id="r-obs" placeholder="Detalhes do que foi encontrado"></textarea></div>
+      <div class="field" id="r-foto-f"><span class="lbl">Fotos do endereço <small>(até 3)</small></span>
+        <div class="photos" id="r-fotos"></div>
+        <div class="ph-row"><label class="filebtn" id="r-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="r-foto"></label><label class="filebtn" id="r-gal">Galeria<input type="file" accept="image/*" id="r-foto-g"></label></div>
+        <div class="hint" id="r-foto-h">Opcional. Obrigatória quando houver avaria.</div></div>
+    </div>
+    <button type="button" class="save" id="r-save">Salvar auditoria</button>
+    <div id="sess-list" style="margin-top:12px"></div>
+  </section>
+
+  <section class="view" id="v-registros" hidden>
+    <p class="lede" id="conn-msg">Conectando à base compartilhada…</p>
+    <p class="note" style="margin:-6px 0 12px">O histórico fica guardado neste aparelho, com fotos, mesmo depois de encerrar a rua.</p>
+    <div class="stats">
+      <div class="stat"><b id="s-hoje">0</b><span>auditorias hoje</span></div>
+      <div class="stat"><b id="s-nc">0</b><span>NC abertas</span></div>
+      <div class="stat"><b id="s-valor">R$ 0</b><span>em NC abertas</span></div>
+    </div>
+    <div class="filters">
+      <select class="in" id="f-periodo" aria-label="Período"><option value="1">Hoje</option><option value="7" selected>Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="0">Tudo</option><option value="d">Escolher data</option></select>
+      <select class="in" id="f-tipo" aria-label="Tipo"><option value="todos">Todos os lançamentos</option><option value="nc" selected>Só não conformidades</option><option value="ok">Só conformes</option></select>
+      <select class="in" id="f-quem" aria-label="Auditor"><option value="eu">Só os meus</option><option value="todos" selected>Todos os auditores</option></select>
+    </div>
+    <div class="dates" id="f-datas" hidden>
+      <div><label for="f-de">De</label><input class="in" type="date" id="f-de"></div>
+      <div><label for="f-ate">Até</label><input class="in" type="date" id="f-ate"></div>
+    </div>
+    <p class="sync" id="sync-line" hidden></p>
+    <div id="pend-box"></div>
+    <div id="list"></div>
+    <div class="export">
+      <button type="button" class="btn full" id="x-ruas">Baixar CSV – Auditoria_Ruas</button>
+      <p class="note">O CSV respeita o período e o filtro acima, com as mesmas colunas da planilha. No Google Planilhas: Arquivo → Importar → Anexar à planilha atual, separador ponto e vírgula.</p>
+      <div id="copy-area"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-bases" hidden>
+    <div class="block">
+      <h3>Planilha Google</h3>
+      <p class="note" style="margin-top:0">Todo lançamento salvo é enviado para a aba <b>Auditoria_Ruas</b> da planilha, com links das fotos no Drive.</p>
+      <div class="field" id="g-url-f"><label for="g-url">Endereço do envio (Apps Script)</label><input class="in" id="g-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
+      <div class="row-btns"><button type="button" class="btn" id="g-save">Salvar endereço</button><button type="button" class="btn" id="g-send">Enviar pendentes</button></div>
+      <button type="button" class="btn full" id="g-all" style="margin-top:8px">Reenviar todo o histórico</button>
+      <p class="okline" id="g-stat"></p>
+      <details style="margin-top:8px"><summary class="link" style="padding:0">Como configurar (uma vez)</summary>
+        <ol class="steps">
+          <li>Abra a planilha <a class="link" style="padding:0" href="https://docs.google.com/spreadsheets/d/1Srs2JdL1WEGsaa-SaLec2TaYQYX_eUmNsU2zE1M4CAA/edit" target="_blank" rel="noopener">Auditoria (Google Sheets)</a>.</li>
+          <li>Extensões → Apps Script. Apague o conteúdo e cole o código do arquivo <b>apps_script_auditoria.gs</b>.</li>
+          <li>Implantar → Nova implantação → tipo <b>App da Web</b>. Executar como: <b>Eu</b>. Quem pode acessar: <b>Qualquer pessoa</b>. Autorize.</li>
+          <li>Copie o URL do app da Web (termina em <b>/exec</b>), cole acima e toque em Salvar endereço.</li>
+        </ol>
+      </details>
+      <p class="note" id="g-claude" hidden>Atenção: aberto pelo link do Claude, o navegador bloqueia o envio para o Google. Use o arquivo HTML aberto no navegador do celular para enviar à planilha.</p>
+    </div>
+
+    <div class="block">
+      <h3>Base de itens (286)</h3>
+      <div class="bstat"><span id="b286-src">Base original</span><span><b id="b286-n">0</b> itens</span></div>
+      <label class="filebtn" style="width:100%">Escolher arquivo 286 (.xlsx ou .xls)<input type="file" id="b286-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="hint">Colunas usadas: Código, Descrição e Vl. ult. entrada.</p>
+      <p class="okline" id="b286-msg"></p>
+    </div>
+
+    <div class="block">
+      <h3>Base de endereços (8022)</h3>
+      <div class="bstat"><span id="b8022-src">Base original</span><span><b id="b8022-n">0</b> endereços</span></div>
+      <label class="filebtn" style="width:100%">Escolher arquivo 8022 (.xlsx ou .xls)<input type="file" id="b8022-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="hint">Colunas usadas: CODPROD, RUA, PREDIO, NIVEL, APTO e QTUNITCX.</p>
+      <p class="okline" id="b8022-msg"></p>
+    </div>
+    <button type="button" class="btn full" id="b-reset">Voltar às bases originais</button>
+    <p class="note">As bases atualizadas ficam guardadas neste aparelho. Atualize em cada celular usado na auditoria.</p>
+  </section>
+</main>
+
+<nav aria-label="Seções">
+  <button type="button" data-v="ruas" aria-current="page">Auditar</button>
+  <button type="button" data-v="registros">Registros<span class="badge" id="nav-pend" hidden></span></button>
+  <button type="button" data-v="bases">Bases</button>
+</nav>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-t">
+  <div class="panel">
+    <h2 id="sh-t">Quem está auditando?</h2>
+    <p class="lede">Pesquise sua matrícula ou nome. Fica salvo neste aparelho.</p>
+    <div id="sh-pick"></div>
+    <p class="hint" style="margin-top:12px">Para trocar depois, toque no seu nome no topo.</p>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets.js"></script>
+<script src="bases.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
