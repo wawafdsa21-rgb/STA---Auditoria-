@@ -482,7 +482,7 @@ function renderPainel(){
   const lastP=per[per.length-1],prevP=per[per.length-2];
   const semRep=Object.keys(T).filter(r=>!repsDaRua(r).length).sort((a,b)=>a-b);
   let h='<div class="src"><span id="pn-info">'+esc(PAINEL_INFO||"Carregando a base do Google Sheets…")+'</span><button type="button" class="btn sm" id="pn-upd">Atualizar</button></div>';
-  const pend=sheetPending();if(pend)h+='<p class="note" style="margin:-4px 0 10px">'+pend+' lançamento'+(pend>1?'s':'')+' deste aparelho ainda não chegaram à planilha e entram no painel assim que forem enviados.</p>';
+  const pend=sheetPending();if(pend)h+='<p class="note" style="margin:-4px 0 10px">'+(pend>1?pend+' lançamentos deste aparelho ainda não chegaram à planilha e entram no painel assim que forem enviados.':'1 lançamento deste aparelho ainda não chegou à planilha e entra no painel assim que for enviado.')+'</p>';
   if(!PAINEL_ROWS){box.innerHTML=h+'<div class="empty">O painel é alimentado pela base do Google Sheets.<br>'+(navigator.onLine?'Toque em Atualizar para carregar.':'Conecte-se à internet para carregar a primeira vez.')+'</div>';$("pn-upd").onclick=()=>carregarPainel(true);return;}
   h+='<div class="kpis"><div class="kpi"><b class="'+qClass(qg)+'-t">'+pct(qg)+'</b><span>qualidade geral (último ciclo de cada rua)</span></div>'+
      '<div class="kpi"><b>'+aud+' / '+ruasBase+'</b><span>ruas auditadas</span></div>'+
