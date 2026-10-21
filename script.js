@@ -319,7 +319,8 @@ function paintSync(){const n=sheetPending(),l=$("sync-line");l.hidden=false;
 async function postSheet(body){
   let r;
   try{r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body,redirect:"follow",cache:"no-store"});}
-  catch(e){await fetch(SHEET_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body});return {ok:true,confirmado:false};}
+  catch(e){try{await fetch(SHEET_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body});}catch(x){throw new Error("sem internet ou link do Apps Script fora do ar.");}
+    throw new Error("o Apps Script não confirmou o recebimento. Abra o link /exec no navegador para ver o motivo (veja a aba Bases).");}
   let txt="";try{txt=await r.text();}catch(e){}
   let j=null;try{j=JSON.parse(txt);}catch(e){}
   if(j&&j.ok)return {ok:true,confirmado:true,adicionados:j.adicionados};
@@ -348,7 +349,8 @@ async function testSheet(){const bt=$("g-test");bt.disabled=true;bt.textContent=
     if(j&&j.ok){lastSheetErr="";toast(j.planilha?"Conectado à planilha \u201c"+j.planilha+"\u201d.":"Conexão com o Apps Script OK.");}
     else if(/<html|<!DOCTYPE/i.test(txt)){lastSheetErr="o Apps Script respondeu com página de erro ou de login. Confira o código colado e se a implantação está com Quem pode acessar = Qualquer pessoa.";toast("O Apps Script não respondeu corretamente.");}
     else{lastSheetErr="resposta inesperada do Apps Script.";toast("Resposta inesperada do Apps Script.");}}
-  catch(e){toast(window.claude?"Pelo link do Claude o envio é bloqueado. Teste pelo site.":"Sem resposta do Apps Script. Confira o link e a internet.");}
+  catch(e){if(window.claude){toast("Pelo link do Claude o envio é bloqueado. Teste pelo site.");}
+    else{lastSheetErr="o Apps Script não liberou a resposta. Quase sempre é a implantação: Quem pode acessar precisa ser Qualquer pessoa, e o código novo precisa estar em uma Nova versão. Toque em Abrir link do Apps Script para ver o motivo.";toast("O Apps Script não respondeu ao formulário.");}}
   bt.disabled=false;bt.textContent="Testar conexão";paintSync();}
 window.addEventListener("online",()=>sheetSync());
 $("g-url").value=SHEET_URL;
@@ -359,6 +361,7 @@ $("g-send").onclick=async()=>{if(!SHEET_URL){toast("Configure o endereço do env
 $("g-all").onclick=async()=>{if(!SHEET_URL){toast("Configure o endereço do envio primeiro.");return;}if(!confirm("Reenviar todos os lançamentos deste aparelho? A planilha ignora os que já existem."))return;const n=await sheetSync(true);toast(n+" lançamento"+(n!==1?"s":"")+" reenviado"+(n!==1?"s":"")+".");};
 if(window.claude)$("g-claude").hidden=false;
 $("g-test").onclick=testSheet;
+$("g-open").onclick=()=>window.open(SHEET_URL,"_blank","noopener");
 
 // atualização das bases
 const nz=s=>norm(String(s==null?"":s)).replace(/[^A-Z0-9]/g,"");
