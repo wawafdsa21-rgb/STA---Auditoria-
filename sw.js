@@ -1,5 +1,5 @@
 /* Auditoria de Ruas – Santa Therezinha: funcionamento offline */
-const VERSION = 'sta-v3';
+const VERSION = 'sta-v4';
 const CORE = ['./', './index.html', './style.css', './script.js', './manifest.json', './icon-192.png', './icon-512.png',
   './lib/html2canvas.min.js', './lib/jspdf.umd.min.js', './lib/xlsx.full.min.js'];
 

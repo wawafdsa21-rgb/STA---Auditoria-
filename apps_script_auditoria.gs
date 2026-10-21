@@ -99,16 +99,39 @@ function resposta(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-function doGet() {
+function doGet(e) {
   try {
     const ss = abrirPlanilha();
-    return resposta({ ok: true, servico: 'Auditoria de Ruas', versao: 3, planilha: ss.getName() });
+    if (e && e.parameter && e.parameter.acao === 'registros') return listarRegistros(ss);
+    return resposta({ ok: true, servico: 'Auditoria de Ruas', versao: 4, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
 }
 
-/** Rode esta função uma vez pelo editor (botão Executar) para autorizar Planilhas e Drive. */
+/** Devolve os lançamentos (sem fotos) para o Painel de ruas do formulário. */
+function listarRegistros(ss) {
+  const campos = ['ID_Auditoria', 'DataHora', 'Nome_Auditor', 'Endereco', 'Rua', 'Possui_NC', 'Erro_Produto',
+    'Prox_Vencimento', 'Sem_Saldo', 'Avaria', 'Qtd_Divergencia_Un', 'Valor_Divergencia',
+    'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em'];
+  const sh = ss.getSheetByName(ABA);
+  if (!sh || sh.getLastRow() < 2) return resposta({ ok: true, colunas: campos, registros: [] });
+  const dados = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  const cab = dados[0].map(String);
+  const idx = campos.map(function (c) { return cab.indexOf(c); });
+  const regs = [];
+  for (let i = 1; i < dados.length; i++) {
+    const l = dados[i];
+    if (idx[0] < 0 || !l[idx[0]]) continue;
+    regs.push(idx.map(function (k) {
+      if (k < 0) return '';
+      const v = l[k];
+      return v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss') : v;
+    }));
+  }
+  return resposta({ ok: true, colunas: campos, registros: regs });
+}
+
 function autorizar() {
   Logger.log('Planilha: ' + abrirPlanilha().getName());
   Logger.log('Pasta de fotos: ' + obterPasta().getName());

@@ -114,8 +114,8 @@ $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("she
 paintWho(); if(!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],registros:["Registros","Histórico das auditorias e não conformidades."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
-function go(v){if(!BAND[v])v="ruas";["ruas","registros","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="bases")paintBases();
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+function go(v){if(!BAND[v])v="ruas";["ruas","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
@@ -266,7 +266,7 @@ function filtered(){const pv=$("f-periodo").value,eu=$("f-quem").value==="eu",tp
   if(pv==="d"){const de=$("f-de").value,ate=$("f-ate").value||de;if(de){from=dayStart(de);to=dayStart(ate)+864e5;}}
   else{const days=+pv;if(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));from=d.getTime();}}
   return allRecs().filter(r=>r.ts>=from&&r.ts<to&&(!eu||r.Matricula_Auditor===auditor)&&(tp==="todos"||(tp==="nc"?r.Possui_NC:!r.Possui_NC)));}
-function renderRecords(){if(typeof renderSess==="function")try{renderSess();}catch(e){}try{paintSync();}catch(e){}
+function renderRecords(){if(typeof renderSess==="function")try{renderSess();}catch(e){}try{if(!$("v-painel").hidden)renderPainel();}catch(e){}try{paintSync();}catch(e){}
   const all=allRecs(),t0=new Date();t0.setHours(0,0,0,0);
   const ab=all.filter(r=>r.Possui_NC&&r.Status_NC!=="Resolvida");
   $("s-hoje").textContent=all.filter(r=>r.ts>=t0.getTime()).length;$("s-nc").textContent=ab.length;
@@ -414,6 +414,132 @@ $("b-reset").onclick=async()=>{if(!confirm("Voltar às bases originais do formul
   paintBases();renderRecords();sheetSync();
 })();
 
+// ---------- Painel de ruas ----------
+const QUADRO_DEF=[["10003193","2,3"],["10003615","4"],["10001781","5,6,7"],["10003748","8,9"],["10003942","10,11"],["10003787","11,12"],["10003850","16,17"],["10003995","18,19"],["10002347","20,22"],["10003643","23"],["10003932","24"],["10003928","25,26"],["10003902","27,28"],["10003936","29,30"],["10004015","31,32"],["10003930","34,35"],["10003961","36,37"],["10003639","38,39,40"],["10003413","41,42"],["10003925","43,44"],["10003316","45,46"]];
+const parseRuas=s=>String(s||"").split(/[^0-9]+/).filter(Boolean).map(x=>String(+x));
+let QUADRO=store.get("audcd_quadro",null)||QUADRO_DEF.map(([m,r])=>({mat:m,ruas:parseRuas(r)}));
+function saveQuadro(){store.set("audcd_quadro",QUADRO);}
+function repsDaRua(rua){rua=String(rua);return QUADRO.filter(q=>q.ruas.includes(rua)).map(q=>q.mat);}
+const nomeC=m=>cIdx.has(m)?C.nome[cIdx.get(m)]:m;
+const curto=n=>{const p=String(n).trim().split(/\s+/);return p.length>1?p[0]+" "+p[p.length-1]:String(n);};
+let RUA_TOT=null;
+function ruaTotMap(){if(RUA_TOT&&RUA_TOT._n===E.id.length)return RUA_TOT;const m={};E.pt.forEach((a,i)=>{if(E.cod[i]||true)m[a[0]]=(m[a[0]]||0)+1;});Object.defineProperty(m,"_n",{value:E.id.length,enumerable:false});RUA_TOT=m;return m;}
+const pbool=v=>v===true||/^(TRUE|VERDADEIRO|SIM|1)$/i.test(String(v==null?"":v).trim());
+const pnum=v=>{if(typeof v==="number")return v;const s=String(v==null?"":v).replace(/[^\d,.-]/g,"");if(!s)return 0;return s.includes(",")?parseFloat(s.replace(/\./g,"").replace(",","."))||0:parseFloat(s)||0;};
+function pts(v,fb){if(typeof v==="number")return v;const s=String(v||"");let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0)).getTime();const t=Date.parse(s);return isNaN(t)?(fb||0):t;}
+function normRec(o){const end=fmtAddr(o.Endereco||"");const rua=unz(o.Rua)||end.split("-")[0]||"";
+  return {id:String(o.ID_Auditoria||""),ts:o.ts?+o.ts:pts(o.DataHora,pts(o.Recebido_Em)),rua:String(rua),end,nc:pbool(o.Possui_NC),sess:String(o.ID_Sessao||""),
+    mat:String(o.Matricula_Colaborador_NC||""),val:pnum(o.Valor_Divergencia),qtd:pnum(o.Qtd_Divergencia_Un),aud:o.Nome_Auditor||""};}
+let PAINEL_ROWS=null,PAINEL_INFO="",painelMode="mes",ruaSel=null,painelBusy=false;
+function painelRecs(){const m=new Map();(PAINEL_ROWS||[]).forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});
+  allRecs().forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});return [...m.values()];}
+function ciclos(recs){const by={};
+  recs.forEach(r=>{if(!r.rua)return;const d=new Date(r.ts);const day=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());const k=r.rua+"|"+(r.sess||day);(by[k]=by[k]||{rua:r.rua,recs:[]}).recs.push(r);});
+  const T=ruaTotMap(),pr={};
+  Object.values(by).forEach(c=>{const ends=new Set(),nce=new Set();let val=0,ts=Infinity,te=0;const auds=new Set();
+    c.recs.forEach(r=>{ends.add(r.end);if(r.nc){nce.add(r.end);val+=r.val;}ts=Math.min(ts,r.ts);te=Math.max(te,r.ts);if(r.aud)auds.add(r.aud);});
+    const tot=Math.max(T[c.rua]||0,ends.size)||1;Object.assign(c,{ts,te,aud:ends.size,nc:nce.size,tot,val,q:Math.max(0,1-nce.size/tot),cob:Math.min(1,ends.size/tot),auditores:[...auds]});
+    (pr[c.rua]=pr[c.rua]||[]).push(c);});
+  Object.values(pr).forEach(a=>a.sort((x,y)=>x.ts-y.ts));return pr;}
+function prever(vals){const v=vals.filter(x=>x!=null).slice(-6);if(!v.length)return null;if(v.length<2)return v[0];const n=v.length;let sx=0,sy=0,sxy=0,sxx=0;
+  v.forEach((y,x)=>{sx+=x;sy+=y;sxy+=x*y;sxx+=x*x;});const b=(n*sxy-sx*sy)/(n*sxx-sx*sx||1),a=(sy-b*sx)/n;return Math.max(0,Math.min(1,a+b*n));}
+function periodKey(ts,mode){const d=new Date(ts);if(mode==="mes")return d.getFullYear()+"-"+pad(d.getMonth()+1);const m=new Date(d.getFullYear(),d.getMonth(),d.getDate());m.setDate(m.getDate()-((m.getDay()+6)%7));return m.getFullYear()+"-"+pad(m.getMonth()+1)+"-"+pad(m.getDate());}
+const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function perLabel(k,mode){const p=k.split("-");return mode==="mes"?MESES[+p[1]-1]+"/"+p[0].slice(2):p[2]+"/"+p[1];}
+function porPeriodo(pr,mode){const P={};Object.values(pr).forEach(cs=>{const last={};cs.forEach(c=>{last[periodKey(c.ts,mode)]=c;});
+  Object.entries(last).forEach(([k,c])=>{const x=P[k]=P[k]||{k,nc:0,tot:0,ruas:0,val:0};x.nc+=c.nc;x.tot+=c.tot;x.ruas++;x.val+=c.val;});});
+  return Object.values(P).sort((a,b)=>a.k<b.k?-1:1).map(p=>(p.q=1-p.nc/p.tot,p));}
+const qClass=q=>{if(q==null)return "q-na";q*=100;return q>=98?"q5":q>=95?"q4":q>=90?"q3":q>=80?"q2":"q1";};
+const pct=q=>q==null?"–":(Math.round(q*1000)/10).toLocaleString("pt-BR",{minimumFractionDigits:1})+"%";
+const pp=d=>(d>0?"+":"")+(Math.round(d*1000)/10).toLocaleString("pt-BR",{minimumFractionDigits:1})+" p.p.";
+function seta(d){if(d==null)return "";return Math.abs(d)<0.0005?"=":d>0?"▲":"▼";}
+function chartSVG(per,prevq,mode){const L=per.slice(-8);if(!L.length)return '<div class="empty">Ainda não há auditorias para comparar.</div>';
+  const it=L.map(p=>({lab:perLabel(p.k,mode),q:p.q,sub:p.ruas+(p.ruas>1?" ruas":" rua")})).concat(prevq!=null?[{lab:"Previsão",q:prevq,f:true}]:[]);
+  const mn=Math.min(...it.map(i=>i.q));const lo=Math.max(0,Math.min(0.9,Math.floor((mn-0.02)*20)/20));
+  const W=340,H=190,pl=34,pb=34,pt=18,bw=(W-pl-4)/it.length,y=q=>pt+(1-(q-lo)/(1-lo))*(H-pt-pb);
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Qualidade por período">';
+  [lo,(lo+1)/2,1].forEach(g=>{s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="currentColor" stroke-opacity=".15"/><text x="'+(pl-4)+'" y="'+(y(g)+3)+'" font-size="9" text-anchor="end">'+Math.round(g*100)+'%</text>';});
+  it.forEach((i,k)=>{const x=pl+k*bw+4,w=Math.max(6,bw-8),yy=y(Math.max(i.q,lo)),h=H-pb-yy;
+    s+=i.f?'<rect x="'+x+'" y="'+yy+'" width="'+w+'" height="'+h+'" rx="3" fill="none" stroke="var(--brand)" stroke-width="1.5" stroke-dasharray="4 3"/>'
+          :'<rect class="c-'+qClass(i.q)+'" x="'+x+'" y="'+yy+'" width="'+w+'" height="'+h+'" rx="3"/>';
+    s+='<text x="'+(x+w/2)+'" y="'+(yy-4)+'" font-size="9" text-anchor="middle" font-weight="600" style="fill:var(--ink)">'+pct(i.q).replace(",0%","%")+'</text>';
+    s+='<text x="'+(x+w/2)+'" y="'+(H-pb+13)+'" font-size="9" text-anchor="middle">'+i.lab+'</text>';
+    if(i.sub)s+='<text x="'+(x+w/2)+'" y="'+(H-pb+24)+'" font-size="8" text-anchor="middle">'+i.sub+'</text>';});
+  return s+'</svg>';}
+function ranking(pr){return QUADRO.filter(q=>q.ruas.length).map(q=>{let nc=0,tot=0,val=0,pnc=0,ptot=0,aud=0,last=0;
+    q.ruas.forEach(r=>{const cs=pr[r];if(!cs||!cs.length)return;const c=cs[cs.length-1];aud++;nc+=c.nc;tot+=c.tot;val+=c.val;last=Math.max(last,c.te);const p=cs[cs.length-2];if(p){pnc+=p.nc;ptot+=p.tot;}});
+    return {mat:q.mat,nome:nomeC(q.mat),ruas:q.ruas,aud,q:tot?1-nc/tot:null,pq:ptot?1-pnc/ptot:null,nc,val,tot,last};})
+  .sort((a,b)=>(a.q==null)-(b.q==null)||(b.q||0)-(a.q||0)||a.val-b.val);}
+function renderPainel(){
+  const box=$("painel");if(!box)return;
+  const recs=painelRecs(),pr=ciclos(recs),T=ruaTotMap();
+  const ruasAll=[...new Set(Object.keys(T).concat(QUADRO.flatMap(q=>q.ruas)).concat(Object.keys(pr)))].sort((a,b)=>a-b);
+  let nc=0,tot=0,val=0,aud=0,ruasBase=Object.keys(T).length;
+  ruasAll.forEach(r=>{const cs=pr[r];if(!cs)return;const c=cs[cs.length-1];nc+=c.nc;tot+=c.tot;val+=c.val;aud++;});
+  const qg=tot?1-nc/tot:null,per=porPeriodo(pr,painelMode),prevq=prever(per.map(p=>p.q));
+  const lastP=per[per.length-1],prevP=per[per.length-2];
+  const semRep=Object.keys(T).filter(r=>!repsDaRua(r).length).sort((a,b)=>a-b);
+  let h='<div class="src"><span id="pn-info">'+esc(PAINEL_INFO||"Dados deste aparelho.")+'</span><button type="button" class="btn sm" id="pn-upd">Atualizar</button></div>';
+  h+='<div class="kpis"><div class="kpi"><b class="'+qClass(qg)+'-t">'+pct(qg)+'</b><span>qualidade geral (último ciclo de cada rua)</span></div>'+
+     '<div class="kpi"><b>'+aud+' / '+ruasBase+'</b><span>ruas auditadas</span></div>'+
+     '<div class="kpi"><b>'+nc+'</b><span>endereços com NC (último ciclo)</span></div>'+
+     '<div class="kpi"><b>'+BRL.format(val).replace(",00","")+'</b><span>valor em divergência</span></div></div>';
+  // mapa
+  h+='<div class="block"><h3>Mapa de ruas <small>toque numa rua</small></h3><div class="rgrid">'+ruasAll.map(r=>{const cs=pr[r]||[],c=cs[cs.length-1],p=cs[cs.length-2],d=c&&p?c.q-p.q:null;
+      return '<button type="button" class="rq '+qClass(c?c.q:null)+(ruaSel===r?' sel':'')+'" data-r="'+r+'" aria-label="Rua '+r+' qualidade '+(c?pct(c.q):'sem auditoria')+'"><i>'+seta(d)+'</i><b>'+r+'</b><span>'+(c?pct(c.q):'—')+'</span></button>';}).join("")+'</div>'+
+    '<div class="leg"><span><i class="q5"></i>≥ 98%</span><span><i class="q4"></i>95–98%</span><span><i class="q3"></i>90–95%</span><span><i class="q2"></i>80–90%</span><span><i class="q1"></i>&lt; 80%</span><span><i class="q-na"></i>sem auditoria</span></div>'+
+    '<p class="note">Qualidade = 1 − (endereços com NC ÷ endereços da rua na 8022). ▲▼ comparam com a auditoria anterior da rua.</p><div id="pn-rua"></div></div>';
+  // evolução
+  h+='<div class="block"><h3>Evolução e previsão</h3><div class="seg" role="group" aria-label="Agrupar por"><button type="button" data-pm="semana" aria-pressed="'+(painelMode==="semana")+'">Por semana</button><button type="button" data-pm="mes" aria-pressed="'+(painelMode==="mes")+'">Por mês</button></div>'+
+     '<div class="chart">'+chartSVG(per,prevq,painelMode)+'</div>'+
+     (lastP?'<p class="note" style="margin-top:6px">'+(prevP?'Período atual '+pct(lastP.q)+' ('+pp(lastP.q-prevP.q)+' vs anterior). ':'Primeiro período registrado. ')+
+       (prevq!=null?'Previsão para o próximo período: <b>'+pct(prevq)+'</b>'+(lastP?', tendência '+(prevq>lastP.q+0.0005?'de melhora':prevq<lastP.q-0.0005?'de piora':'estável')+'.':'.'):'')+' A previsão usa a tendência dos últimos 6 períodos.</p>':'')+'</div>';
+  // ranking
+  const rk=ranking(pr);
+  h+='<div class="block"><h3>Ranking de repositores <small>último ciclo das ruas</small></h3>'+rk.map((x,i)=>{const pos=x.q==null?'–':(i+1)+'º';const d=x.q!=null&&x.pq!=null?x.q-x.pq:null;
+      return '<div class="rk"><div class="pos">'+pos+'</div><div><div class="nm">'+esc(curto(x.nome))+'</div><div class="sm">Ruas '+x.ruas.join(", ")+' · '+x.aud+' de '+x.ruas.length+' auditada'+(x.ruas.length>1?'s':'')+'</div>'+
+        '<div class="bar"><i class="'+qClass(x.q)+'" style="width:'+(x.q==null?0:Math.round(x.q*100))+'%"></i></div>'+
+        '<div class="sm">'+(x.q==null?'Sem auditoria ainda':x.nc+' NC · '+BRL.format(x.val)+(d!=null?' · '+seta(d)+' '+pp(d):''))+'</div></div><div class="qv '+qClass(x.q)+'-t">'+pct(x.q)+'</div></div>';}).join("")+
+     (semRep.length?'<p class="note">Ruas sem repositor no quadro: '+semRep.join(", ")+'.</p>':'')+'</div>';
+  // quadro
+  h+='<details class="block" id="pn-quadro"><summary style="cursor:pointer;font-weight:600;color:var(--brand)">Quadro de repositores ('+QUADRO.length+')</summary><p class="note">Ruas de cada repositor, separadas por vírgula. Usado no ranking e para preencher o repositor ao iniciar uma rua.</p>'+
+     QUADRO.map((q,i)=>'<div class="qe"><div><b>'+esc(curto(nomeC(q.mat)))+'</b><div class="sm" style="color:var(--muted);font-size:.78rem">'+esc(q.mat)+'</div></div><input class="in" data-qi="'+i+'" value="'+esc(q.ruas.join(", "))+'" inputmode="numeric" aria-label="Ruas de '+esc(nomeC(q.mat))+'"><button type="button" class="btn sm" data-qx="'+i+'" aria-label="Remover">×</button></div>').join("")+
+     '<div class="field"><label>Adicionar repositor</label><div id="qa-pick"></div><input class="in" id="qa-ruas" placeholder="Ruas, ex.: 13, 14" inputmode="numeric" style="margin-top:6px"><button type="button" class="btn full" id="qa-add" style="margin-top:6px">Adicionar ao quadro</button></div>'+
+     '<button type="button" class="btn full" id="qa-reset" style="margin-top:8px">Restaurar quadro padrão</button></details>';
+  const wasOpen=$("pn-quadro")&&$("pn-quadro").open;
+  box.innerHTML=h;if(wasOpen)$("pn-quadro").open=true;
+  box.querySelectorAll(".rq").forEach(b=>b.onclick=()=>{ruaSel=ruaSel===b.dataset.r?null:b.dataset.r;renderPainel();if(ruaSel)$("pn-rua").scrollIntoView({block:"nearest",behavior:"smooth"});});
+  box.querySelectorAll("[data-pm]").forEach(b=>b.onclick=()=>{painelMode=b.dataset.pm;renderPainel();});
+  $("pn-upd").onclick=()=>carregarPainel(true);
+  box.querySelectorAll("[data-qi]").forEach(inp=>inp.onchange=()=>{QUADRO[+inp.dataset.qi].ruas=parseRuas(inp.value);saveQuadro();renderPainel();toast("Quadro atualizado.");});
+  box.querySelectorAll("[data-qx]").forEach(b=>b.onclick=()=>{const q=QUADRO[+b.dataset.qx];if(!confirm("Remover "+curto(nomeC(q.mat))+" do quadro?"))return;QUADRO.splice(+b.dataset.qx,1);saveQuadro();renderPainel();});
+  const qp=picker($("qa-pick"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab});
+  $("qa-add").onclick=()=>{if(qp.value==null){toast("Escolha o colaborador.");return;}const m=C.mat[qp.value],ru=parseRuas($("qa-ruas").value);if(!ru.length){toast("Informe as ruas.");return;}
+    const ex=QUADRO.find(q=>q.mat===m);if(ex)ex.ruas=[...new Set(ex.ruas.concat(ru))];else QUADRO.push({mat:m,ruas:ru});saveQuadro();renderPainel();toast("Repositor adicionado ao quadro.");};
+  $("qa-reset").onclick=()=>{if(!confirm("Voltar ao quadro padrão de repositores?"))return;QUADRO=QUADRO_DEF.map(([m,r])=>({mat:m,ruas:parseRuas(r)}));saveQuadro();renderPainel();};
+  // detalhe da rua
+  if(ruaSel){const r=ruaSel,cs=pr[r]||[],reps=repsDaRua(r).map(m=>curto(nomeC(m))).join(" e ")||"sem repositor no quadro";const pv=prever(cs.map(c=>c.q));
+    $("pn-rua").innerHTML='<div class="block" style="margin:12px 0 0;border-color:var(--brand)"><h3>Rua '+esc(r)+' <small>'+(T[r]||0)+' endereços na 8022</small></h3><p class="note" style="margin-top:0">Repositor: <b>'+esc(reps)+'</b></p>'+
+      (cs.length?'<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Data</th><th class="n">Audit.</th><th class="n">NC</th><th class="n">Qualid.</th><th class="n">Δ</th></tr></thead><tbody>'+
+        cs.slice().reverse().map((c,i,a)=>{const p=a[i+1];const d=p?c.q-p.q:null;return '<tr><td>'+fmtDT(new Date(c.ts)).slice(0,10)+'</td><td class="n">'+c.aud+' <small>('+pct(c.cob).replace(/,\d%$/,"%")+')</small></td><td class="n">'+c.nc+'</td><td class="n"><b>'+pct(c.q)+'</b></td><td class="n">'+(d==null?'–':seta(d)+' '+pp(d).replace(" p.p.",""))+'</td></tr>';}).join("")+
+        '</tbody></table></div><p class="note">Previsão para a próxima auditoria: <b>'+pct(pv)+'</b>. Valor em divergência no último ciclo: '+BRL.format(cs[cs.length-1].val)+'.</p>':'<p class="note">Rua ainda não auditada.</p>')+'</div>';}
+}
+async function carregarPainel(manual){
+  if(painelBusy)return;
+  if(!SHEET_URL||window.claude){PAINEL_INFO="Dados deste aparelho.";renderPainel();return;}
+  if(!navigator.onLine){PAINEL_INFO=PAINEL_ROWS?"Sem internet: mostrando a última cópia da planilha.":"Sem internet: mostrando dados deste aparelho.";renderPainel();return;}
+  painelBusy=true;const inf=$("pn-info");if(inf)inf.textContent="Atualizando com a planilha…";
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=registros&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+    if(j&&j.ok&&Array.isArray(j.registros)){PAINEL_ROWS=j.registros.map(row=>{const o={};j.colunas.forEach((c,i)=>o[c]=row[i]);return o;});
+      PAINEL_INFO="Planilha Google ("+PAINEL_ROWS.length+" lançamentos) · "+fmtDT(new Date()).slice(0,16);IDB.set("painel_cache",{rows:PAINEL_ROWS,info:PAINEL_INFO}).catch(()=>{});
+      if(manual)toast("Painel atualizado com a planilha.");}
+    else PAINEL_INFO="Atualize o Apps Script (versão 4) para o painel somar todos os auditores. Mostrando dados deste aparelho.";
+  }catch(e){PAINEL_INFO=PAINEL_ROWS?"Sem conexão com a planilha: mostrando a última cópia.":"Sem conexão com a planilha: mostrando dados deste aparelho.";}
+  painelBusy=false;renderPainel();
+}
+IDB.get("painel_cache").then(c=>{if(c&&c.rows&&!PAINEL_ROWS){PAINEL_ROWS=c.rows;PAINEL_INFO="Última cópia da planilha: "+String(c.info||"").split("· ").pop();}}).catch(()=>{});
+
 // modo offline (site)
 if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
   window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});
@@ -436,9 +562,12 @@ function renderSess(){
     if(box.dataset.mode==="start")return;box.dataset.mode="start";
     box.innerHTML='<h3>Auditar uma rua inteira</h3><p class="note" style="margin-top:0">Informe a rua e o repositor uma vez e lance todos os endereços em sequência, quantos precisar.</p>'+
       '<div class="field" id="ss-rua-f"><label for="ss-rua">Rua</label><input class="in" id="ss-rua" type="text" inputmode="numeric" placeholder="Ex.: 44"></div>'+
-      '<div class="field" id="ss-rep-f"><label>Repositor da rua</label><div id="ss-rep"></div></div>'+
+      '<div class="field" id="ss-rep-f"><label>Repositor da rua</label><div id="ss-rep"></div><div class="hint" id="ss-rep-h">Preenchido pelo quadro de repositores ao digitar a rua.</div></div>'+
       '<button type="button" class="save" id="ss-go" style="margin-top:14px">Iniciar auditoria da rua</button>';
     const sp=picker($("ss-rep"),{ph:"Matrícula do repositor (ou nome)",search:searchColab,describe:descColab});
+    $("ss-rua").addEventListener("input",()=>{const rua=String(parseInt($("ss-rua").value.replace(/\D/g,""),10)||"");const reps=repsDaRua(rua).filter(m=>cIdx.has(m));const hh=$("ss-rep-h");
+      if(reps.length){sp.set(cIdx.get(reps[0]));hh.textContent="Pelo quadro: "+reps.map(m=>curto(nomeC(m))).join(" e ")+(reps.length>1?". Se for o outro, toque em Trocar.":".");}
+      else hh.textContent=rua?"Rua sem repositor no quadro. Escolha o repositor.":"Preenchido pelo quadro de repositores ao digitar a rua.";});
     $("ss-go").onclick=()=>{
       if(!auditor){$("sheet").hidden=false;return;}
       const rua=String(parseInt($("ss-rua").value.replace(/\D/g,""),10)||"");let bad=false;
