@@ -352,7 +352,9 @@ async function testSheet(){const bt=$("g-test");bt.disabled=true;bt.textContent=
   catch(e){if(window.claude){toast("Pelo link do Claude o envio é bloqueado. Teste pelo site.");}
     else{lastSheetErr="o Apps Script não liberou a resposta. Quase sempre é a implantação: Quem pode acessar precisa ser Qualquer pessoa, e o código novo precisa estar em uma Nova versão. Toque em Abrir link do Apps Script para ver o motivo.";toast("O Apps Script não respondeu ao formulário.");}}
   bt.disabled=false;bt.textContent="Testar conexão";paintSync();}
-window.addEventListener("online",()=>sheetSync());
+window.addEventListener("online",()=>{toast("Internet de volta. Enviando pendentes…");sheetSync().then(n=>n&&toast(n+" lançamento"+(n>1?"s enviados":" enviado")+" à planilha."));});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)sheetSync();});
+setInterval(()=>{if(navigator.onLine&&sheetPending())sheetSync();},45000);
 $("g-url").value=SHEET_URL;
 $("g-save").onclick=()=>{const u=$("g-url").value.trim();
   if(u&&!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(u)){setErr("g-url-f","Cole o URL do app da Web do Apps Script (termina em /exec).");return;}
@@ -368,7 +370,7 @@ const nz=s=>norm(String(s==null?"":s)).replace(/[^A-Z0-9]/g,"");
 function cellStr(v){if(v==null)return "";if(typeof v==="number")return Number.isInteger(v)?String(v):String(v);return String(v).trim();}
 function cellNum(v){if(typeof v==="number")return v;const s=String(v==null?"":v).trim();if(!s)return 0;const n=s.includes(",")?parseFloat(s.replace(/\./g,"").replace(",",".")):parseFloat(s);return isNaN(n)?0:n;}
 function findHeader(rows,need){for(let i=0;i<Math.min(rows.length,40);i++){const h=(rows[i]||[]).map(nz);if(need.every(f=>h.some(f)))return {i,h};}return null;}
-const XLSX_URL="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const XLSX_URL="lib/xlsx.full.min.js";
 async function readSheet(file){if(!window.XLSX){try{await loadScript(XLSX_URL);}catch(e){throw new Error("Para ler o Excel é preciso internet na primeira vez. Conecte e tente de novo.");}}const buf=await file.arrayBuffer();const wb=XLSX.read(buf,{type:"array",dense:true});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});}
 function parse286(rows){
   const isCod=x=>x==="CODIGO"||x==="COD"||x==="CODPROD",isDesc=x=>x==="DESCRICAO"||x==="DESCRICAOPRODUTO",isVl=x=>x.includes("ULT")&&x.includes("ENTRADA");
@@ -412,6 +414,10 @@ $("b-reset").onclick=async()=>{if(!confirm("Voltar às bases originais do formul
   paintBases();renderRecords();sheetSync();
 })();
 
+// modo offline (site)
+if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});
+}
 // sessão de rua
 function sessRecs(){return S?allRecs().filter(r=>r.ID_Sessao===S.id):[];}
 function endSess(){S=null;store.set("audcd_sessao",null);setMode("prod");reset();renderSess();}
@@ -519,7 +525,8 @@ const FIT_JS='function stFit(el){var c=el.cloneNode(true);c.style.cssText="posit
 (new Function(FIT_JS+';window.stFit=stFit;'))();
 function fitWhenReady(el,cb){const imgs=[...el.querySelectorAll("img")].filter(i=>!i.complete);let n=imgs.length;const go=()=>{window.stFit(el);cb&&cb();};if(!n){go();return;}imgs.forEach(i=>{i.onload=i.onerror=()=>{if(--n===0)go();};});}
 // relatório consolidado da rua
-const SCSS='.pd .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.pd .sum div{border:1px solid #C9D6EA;padding:6px;text-align:center}.pd .sum b{display:block;font-size:16px;color:#0A4DA2}.pd .sum span{font-size:10px;color:#4F6380}'+
+const SCSS='.pd .fg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pd .fg figure{margin:0;page-break-inside:avoid;break-inside:avoid}.pd .fg img{display:block;width:100%;height:36mm;object-fit:cover;border:1px solid #C9D6EA}.pd .fg figcaption{font-size:9.5px;color:#4F6380;margin-top:2px;line-height:1.2}'+
+ '.pd .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.pd .sum div{border:1px solid #C9D6EA;padding:6px;text-align:center}.pd .sum b{display:block;font-size:16px;color:#0A4DA2}.pd .sum span{font-size:10px;color:#4F6380}'+
  '.pd .lt th{background:#0A4DA2;color:#fff;font-size:10.5px;text-align:left;padding:4px 6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.pd .lt td{font-size:10.5px}.pd .lt tr{page-break-inside:avoid}.pd .lt td.n{text-align:right;white-space:nowrap}.pd .lt tfoot td{font-weight:bold;background:#F2F6FC}'+
  '.pd .leg li{border-left-width:3px}';
 (function(){const s=document.createElement("style");s.textContent=SCSS;document.head.appendChild(s);})();
@@ -537,6 +544,8 @@ function sessDocHTML(S,recs){
    '<h2>Não conformidades registradas</h2>'+(ncs.length?'<table class="lt"><thead><tr><th>Endereço</th><th>Item</th><th>Ocorrência</th><th>Un</th><th>Vl. un.</th><th>Valor</th></tr></thead><tbody>'+
      ncs.slice().reverse().map(r=>'<tr><td>'+esc(fmtAddr(r.Endereco))+'</td><td>'+esc(r.Produto+" – "+r.Descricao_Produto)+'</td><td>'+esc(ocShort(r))+'</td><td class="n">'+esc(r.Qtd_Divergencia_Un)+'</td><td class="n">'+BRL.format(+r.Vl_Ult_Entrada||0)+'</td><td class="n">'+BRL.format(+r.Valor_Divergencia||0)+'</td></tr>').join("")+
      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">'+ncs.reduce((a,r)=>a+(+r.Qtd_Divergencia_Un||0),0)+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>':'<div class="obs">Nenhuma não conformidade nesta rua.</div>')+
+   (function(){const pics=[];recs.slice().reverse().forEach(r=>{const fs=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);fs.forEach(s=>pics.push({s,a:fmtAddr(r.Endereco),i:r.Produto,nc:r.Possui_NC}));});
+     return pics.length?'<h2>Registro fotográfico</h2><div class="fg">'+pics.map(x=>'<figure><img src="'+x.s+'" alt="Foto do endereço '+esc(x.a)+'"><figcaption><b>'+esc(x.a)+'</b> · '+esc(x.i)+(x.nc?' · NC':' · conforme')+'</figcaption></figure>').join("")+'</div>':'';})()+
    (Object.keys(used).length?'<h2>Por que cada ocorrência importa</h2><ul class="ocx leg">'+Object.keys(used).map(k=>'<li><b>'+OC_TXT[k][0]+'</b><p>'+OC_TXT[k][1]+'</p></li>').join("")+'</ul>':'')+
    '<p class="decl">Declaro ciência das não conformidades registradas acima e das informações de quantidade e valor apuradas na auditoria da rua '+esc(S.rua)+'.</p>'+
    '<div class="sg"><div><b>Repositor</b>'+esc(S.repNome)+'<small>Matrícula '+esc(S.rep)+'</small><small>Data: ___/___/______</small></div>'+
@@ -553,8 +562,8 @@ function waText(r){const vl=Math.round((+r.Vl_Ult_Entrada||0)*100)/100;
 function sessText(S,recs){const ncs=recs.filter(r=>r.Possui_NC),tot=ncs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
   return ["*NÃO CONFORMIDADES – Rua "+S.rua+"*","Nº "+S.id,"Auditor: "+S.audNome+" ("+S.aud+")","Repositor: "+S.repNome+" ("+S.rep+")",recs.length+" endereços auditados · "+ncs.length+" NC","*Valor total: "+BRL.format(tot)+"*"].join("\n");}
 const waURLt=t=>"https://wa.me/"+WA_NUM+"?text="+encodeURIComponent(t);
-const H2C="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-const JSPDF="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+const H2C="lib/html2canvas.min.js";
+const JSPDF="lib/jspdf.umd.min.js";
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>{s.remove();rej(new Error("load"));};document.head.appendChild(s);});}
 async function makePdf(html,multi){
   if(!window.html2canvas)await loadScript(H2C);if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(JSPDF);
