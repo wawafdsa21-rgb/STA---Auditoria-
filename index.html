@@ -97,7 +97,7 @@
       <p class="note" style="margin-top:0">Todo lançamento salvo é enviado para a aba <b>Auditoria_Ruas</b> da planilha, com links das fotos no Drive.</p>
       <div class="field" id="g-url-f"><label for="g-url">Endereço do envio (Apps Script)</label><input class="in" id="g-url" type="url" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec"></div>
       <div class="row-btns"><button type="button" class="btn" id="g-save">Salvar endereço</button><button type="button" class="btn" id="g-send">Enviar pendentes</button></div>
-      <button type="button" class="btn full" id="g-all" style="margin-top:8px">Reenviar todo o histórico</button>
+      <div class="row-btns" style="margin-top:8px"><button type="button" class="btn" id="g-test">Testar conexão</button><button type="button" class="btn" id="g-all">Reenviar histórico</button></div>
       <p class="okline" id="g-stat"></p>
       <details style="margin-top:8px"><summary class="link" style="padding:0">Como configurar (uma vez)</summary>
         <ol class="steps">
@@ -147,6 +147,5 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="script.js"></script>
-
 </body>
 </html>
