@@ -302,8 +302,8 @@ $("x-ruas").onclick=async()=>{
   $("cpb").onclick=async()=>{try{await navigator.clipboard.writeText($("cp").value);toast("Copiado.");}catch(e){$("cp").select();toast("Selecionado: use Copiar do teclado.");}};
 };
 // Google Sheets
-const SHEET_DEFAULT="https://script.google.com/macros/s/AKfycbwZo31_y64gd5px4BEsVYavwmj-KXSFLIDoIJN7u65wBBF6mR4iYNq7inqURMDOAEuc-w/exec";
-const SHEET_OLD=["https://script.google.com/macros/s/AKfycbzu9chRcXb6EoqIvyU7GcBTn5y7MjBKQ7GIV6QCCuy4cOjzROAApZ00HrJiEIQcsJBa6A/exec"];
+const SHEET_DEFAULT="https://script.google.com/macros/s/AKfycbz_fG-OrkZkExU6Qle2q8d9a_kt5rQfFAvL322zMO3mFWDIV3j86YtOTnD6nKct2kqznQ/exec";
+const SHEET_OLD=["https://script.google.com/macros/s/AKfycbzu9chRcXb6EoqIvyU7GcBTn5y7MjBKQ7GIV6QCCuy4cOjzROAApZ00HrJiEIQcsJBa6A/exec","https://script.google.com/macros/s/AKfycbwZo31_y64gd5px4BEsVYavwmj-KXSFLIDoIJN7u65wBBF6mR4iYNq7inqURMDOAEuc-w/exec"];
 let SHEET_URL=store.get("audcd_sheet_url","");
 if(!SHEET_URL||SHEET_OLD.includes(SHEET_URL)){SHEET_URL=SHEET_DEFAULT;store.set("audcd_sheet_url","");}
 let syncing=false,syncAgain=false,lastSheetErr="",lastSheetOk=store.get("audcd_sheet_ok","");
