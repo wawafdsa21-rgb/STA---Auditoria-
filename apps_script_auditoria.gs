@@ -3,7 +3,7 @@
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
- *   - Auditoria_Cargas   (permissão aud_car) – estrutura pronta; rode prepararAbaCargas uma vez
+ *   - Auditoria_Cargas   (permissão aud_car)
  * Login pela aba Permissionamento (Matrícula, Permissão, Observação, Senha, Status).
  * Quem tem a permissão aud_adm administra os acessos pelo aplicativo.
  * Fotos vão para a pasta "Fotos Auditoria de Ruas" no Google Drive.
@@ -43,7 +43,7 @@ const ABAS = {
     nome: 'Auditoria_Cargas', perm: 'aud_car',
     colunas: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente',
       'Nome_Conferente', 'Box', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade',
-      'Motivo', 'Links_Fotos', 'ID_Sessao', 'Recebido_Em'],
+      'Motivo', 'Links_Fotos', 'ID_Sessao', 'Recebido_Em', 'Valor_Total'],
     texto: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Matricula_Conferente', 'Box', 'Numero_OS',
       'Codigo_Produto', 'ID_Sessao']
   }
@@ -442,6 +442,7 @@ function testeLogin() {
 function testeGravacao() {
   const ss = abrirPlanilha(), agora = new Date().getTime();
   gravar(ss, ABAS.ruas, [{ ID_Auditoria: 'TESTE-RUA-' + agora, DataHora: new Date().toLocaleString('pt-BR'), Nome_Auditor: 'TESTE', Endereco: '1-1-1-1', Observacao: 'Teste – pode apagar', Status_NC: 'Conforme' }]);
+  gravar(ss, ABAS.cargas, [{ ID_Auditoria: 'TESTE-CAR-' + agora, DataHora: new Date().toLocaleString('pt-BR'), Nome_Auditor: 'TESTE', Box: '1', Numero_OS: '0', Codigo_Produto: '338', Quantidade: 1, Motivo: 'Falta', Valor_Total: 3.02 }]);
   gravar(ss, ABAS.retorno, [{ ID_Auditoria: 'TESTE-RET-' + agora, DataHora: new Date().toLocaleString('pt-BR'), Nome_Auditor: 'TESTE', Produto: '338', Rua: '44', Observacao: 'Teste – pode apagar', Status_NC: 'Conforme' }]);
   Logger.log('Linhas de teste gravadas em Auditoria_Ruas e Auditoria_Retorno.');
 }
