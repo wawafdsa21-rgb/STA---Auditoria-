@@ -281,3 +281,5 @@ nav button{font-size:.98rem!important;padding:0 2px}
 .au-b{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .au.dirty{border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 25%,transparent)}
 @media (prefers-reduced-motion: reduce){.sw i,.sw i::after{transition:none}}
+nav[data-n="6"] button{font-size:.86rem!important}
+nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}

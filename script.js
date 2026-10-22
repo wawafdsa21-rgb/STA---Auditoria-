@@ -112,7 +112,7 @@ const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
 const podeVer=v=>!VIEW_PERM[v]||temPerm(VIEW_PERM[v]);
 function primeiraTela(){return ["ruas","retorno","cargas"].find(podeVer)||"registros";}
 function aplicarPerms(){let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok)n++;});
-  document.querySelector("nav").style.setProperty("--nav-n",n);
+  document.querySelector("nav").style.setProperty("--nav-n",n);document.querySelector("nav").dataset.n=n;
   const fa=$("f-aba");if(fa){[...fa.options].forEach(o=>o.hidden=!podeVer(o.value));if(!podeVer(fa.value))fa.value=temPerm("aud_ret")&&!temPerm("aud_rua")?"retorno":"ruas";}}
 async function sha256(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");}catch(e){return "";}}
 function lgMsg(m){$("lg-msg").textContent=m||"";}
