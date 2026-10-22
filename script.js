@@ -104,18 +104,62 @@ let db=null,downloads=null,canWrite=true,dbState="loading";
 const remote={ruas:[]};
 let queue=store.get("audcd_fila",[]).filter(x=>x.col==="ruas");
 
+// login e permissões
+const DEMO=!!window.claude;
+let LOGIN=DEMO?{demo:true,perms:["aud_rua","aud_ret","aud_car"]}:store.get("audcd_login",null);
+const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car"};
+const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
+const podeVer=v=>!VIEW_PERM[v]||temPerm(VIEW_PERM[v]);
+function primeiraTela(){return ["ruas","retorno","cargas"].find(podeVer)||"registros";}
+function aplicarPerms(){let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok)n++;});
+  document.querySelector("nav").style.setProperty("--nav-n",n);
+  const fa=$("f-aba");if(fa){[...fa.options].forEach(o=>o.hidden=!podeVer(o.value));if(!podeVer(fa.value))fa.value=temPerm("aud_ret")&&!temPerm("aud_rua")?"retorno":"ruas";}}
+async function sha256(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");}catch(e){return "";}}
+function lgMsg(m){$("lg-msg").textContent=m||"";}
+function entrar(){store.set("audcd_login",LOGIN);auditor=LOGIN.mat;store.set("audcd_auditor",auditor);$("login").hidden=true;aplicarPerms();paintWho();go(primeiraTela());renderRecords();toast("Olá, "+String(nomeAud()).split(" ")[0]+".");setTimeout(()=>sheetSync(),300);}
+async function fazerLogin(){
+  const mat=$("lg-mat").value.replace(/\D/g,""),sen=$("lg-sen").value.trim();lgMsg("");
+  if(!mat||!sen){lgMsg("Informe matrícula e senha.");return;}
+  const bt=$("lg-go");bt.disabled=true;bt.textContent="Entrando…";
+  const h=await sha256(mat+":"+sen+":auditoria-sta");
+  try{
+    if(navigator.onLine&&SHEET_URL){
+      let j=null;
+      try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"login",matricula:mat,senha:sen}),redirect:"follow",cache:"no-store"});j=await r.json();}catch(e){j=null;}
+      if(j&&j.ok){LOGIN={mat:String(j.matricula),nome:j.nome||(cIdx.has(mat)?C.nome[cIdx.get(mat)]:""),perms:j.permissoes||[],token:j.token,hash:h,ts:Date.now()};
+        const cr=store.get("audcd_creds",{});cr[mat]=LOGIN;store.set("audcd_creds",cr);$("lg-sen").value="";entrar();return;}
+      if(j&&!j.ok){lgMsg(j.erro||"Matrícula ou senha inválidas.");return;}
+    }
+    const c=store.get("audcd_creds",{})[mat];
+    if(c&&h&&c.hash===h){LOGIN=c;$("lg-sen").value="";entrar();toast("Entrou sem internet, com o último acesso validado neste aparelho.");return;}
+    lgMsg(navigator.onLine?"Não foi possível falar com a planilha agora. Tente de novo.":(c?"Senha diferente da última usada neste aparelho.":"Sem internet: este aparelho ainda não tem acesso salvo para essa matrícula."));
+  }finally{bt.disabled=false;bt.textContent="Entrar";}
+}
+function sair(){if(!confirm("Sair da conta de "+curtoNome(nomeAud())+"?"))return;LOGIN=null;store.set("audcd_login",null);auditor=null;mostrarLogin();}
+const curtoNome=n=>{const p=String(n||"").trim().split(/\s+/);return p.length>1?p[0]+" "+p[p.length-1]:String(n||"");};
+function mostrarLogin(){const hl=document.querySelector("header img");if(hl&&hl.src)$("lg-logo").src=hl.src;$("login").hidden=false;setTimeout(()=>$("lg-mat").focus(),50);}
+$("lg-go").onclick=fazerLogin;
+$("lg-mat").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("lg-sen").focus();}});
+$("lg-sen").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();fazerLogin();}});
+async function revalidar(){if(DEMO||!LOGIN||!LOGIN.token||!navigator.onLine||!SHEET_URL)return;
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=sessao&token="+encodeURIComponent(LOGIN.token)+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+    if(j&&j.ok){LOGIN.perms=j.permissoes||LOGIN.perms;if(j.nome)LOGIN.nome=j.nome;store.set("audcd_login",LOGIN);const cr=store.get("audcd_creds",{});if(cr[LOGIN.mat]){cr[LOGIN.mat].perms=LOGIN.perms;store.set("audcd_creds",cr);}aplicarPerms();paintWho();const cur=document.querySelector("nav button[aria-current]");if(cur&&!podeVer(cur.dataset.v))go(primeiraTela());}
+    else if(j&&j.ok===false&&/permiss|inv[aá]lido|expirad|login/i.test(j.erro||"")){toast(j.erro);LOGIN=null;store.set("audcd_login",null);const cr=store.get("audcd_creds",{});delete cr[auditor];store.set("audcd_creds",cr);auditor=null;mostrarLogin();}
+  }catch(e){}}
+
 // auditor
-let auditor=store.get("audcd_auditor",null);
-if(auditor!=null&&!cIdx.has(auditor)) auditor=null;
+let auditor=DEMO?store.get("audcd_auditor",null):(LOGIN?LOGIN.mat:null);
+if(DEMO&&auditor!=null&&!cIdx.has(auditor)) auditor=null;
 const shPick=picker($("sh-pick"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab,onPick:k=>{if(k==null)return;auditor=C.mat[k];store.set("audcd_auditor",auditor);paintWho();$("sheet").hidden=true;renderRecords();toast("Olá, "+C.nome[k].split(" ")[0]+".");}});
-function paintWho(){$("whoName").textContent=auditor?C.nome[cIdx.get(auditor)]+" · "+auditor:"Identificar auditor";}
-$("whoBtn").addEventListener("click",()=>{shPick.clear();$("sheet").hidden=false;shPick.focus();});
+function nomeAud(){if(LOGIN&&!LOGIN.demo&&LOGIN.nome)return LOGIN.nome;return auditor&&cIdx.has(auditor)?C.nome[cIdx.get(auditor)]:(auditor||"");}
+function paintWho(){$("whoName").textContent=auditor?nomeAud()+" · "+auditor:"Identificar auditor";}
+$("whoBtn").addEventListener("click",()=>{if(!DEMO){if(LOGIN)sair();return;}shPick.clear();$("sheet").hidden=false;shPick.focus();});
 $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("sheet").hidden=true;});
-paintWho(); if(!auditor)$("sheet").hidden=false;
+paintWho(); if(DEMO&&!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
-function go(v){if(!BAND[v])v="ruas";["ruas","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Confira o retorno do repositor, com foto do produto e da etiqueta."],cargas:["Auditoria de cargas","Em preparação."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();["ruas","retorno","cargas","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
@@ -141,7 +185,7 @@ const rEnd=picker($("r-end"),{ph:"Prédio.nível.apto – ex.: 35.1.1",mode:"dec
 function setMode(m){mode=m;document.querySelectorAll(".mini button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===m));
   $("r-prod").hidden=m!=="prod";$("r-end").hidden=m!=="end";$("r-prod-l").textContent=m==="end"?(S?"Endereço na rua "+S.rua:"Endereço auditado"):(R.flags.erro?"Item encontrado fora do lugar":"Produto auditado");}
 document.querySelectorAll(".mini button").forEach(b=>b.addEventListener("click",()=>{if(b.dataset.m===mode)return;setMode(b.dataset.m);(mode==="end"?rEnd:rProd).focus();}));
-document.querySelectorAll(".tg").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.k;R.flags[k]=!R.flags[k];b.setAttribute("aria-pressed",R.flags[k]);
+document.querySelectorAll(".tg[data-k]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.k;R.flags[k]=!R.flags[k];b.setAttribute("aria-pressed",R.flags[k]);
   if(k==="erro"){
     if(R.flags.erro&&mode==="end"&&R.addr!=null){const f=R.addr;setMode("prod");R.prod=null;rProd.clear();R.addr=f;R.addrManual=true;rAddr.set(f);toast("Pesquise o item que estava no endereço "+E.id[f]+".");rProd.focus();}
     else{R.addr=null;R.addrManual=false;rAddr.clear();if(!R.flags.erro&&mode==="end")rEnd.clear();}
@@ -187,7 +231,7 @@ paint();
 
 function reset(){
   rProd.clear();rAddr.clear();rRep.clear();rEnd.clear();if(S&&cIdx.has(S.rep))rRep.set(cIdx.get(S.rep));R.prod=null;R.addr=null;R.addrManual=false;R.fotos=[];
-  Object.keys(R.flags).forEach(k=>R.flags[k]=false);document.querySelectorAll(".tg").forEach(b=>b.setAttribute("aria-pressed","false"));
+  Object.keys(R.flags).forEach(k=>R.flags[k]=false);document.querySelectorAll(".tg[data-k]").forEach(b=>b.setAttribute("aria-pressed","false"));
   $("r-venc").value="";$("r-tipo").value="";$("r-qtd").value="0";$("r-obs").value="";$("r-foto").value="";paintFotos();
   document.querySelectorAll("#v-ruas .field.bad").forEach(f=>setErr(f.id,""));setMode(S?"end":mode);paint();
 }
@@ -207,7 +251,7 @@ $("r-save").addEventListener("click",async()=>{
   chk(f.avaria&&$("r-tipo").value==="Outro"&&!$("r-obs").value.trim(),"r-obs-f","Descreva a avaria na observação.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
   const now=new Date(),[rua,pre,niv,apt]=E.id[ad].split("-"),vl=P.vl[R.prod],qq=nc?q:0,ri=rRep.value;
-  const rec={ID_Auditoria:newId("AR"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:C.nome[cIdx.get(auditor)],
+  const rec={ID_Auditoria:newId("AR"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),_aba:"ruas",
     Produto:P.cod[R.prod],Descricao_Produto:P.desc[R.prod],Endereco:E.id[ad],Rua:rua,Predio:pre,Nivel:niv,Apto:apt,
     Erro_Produto:f.erro,Endereco_Correto:pk!=null?E.id[pk]:"",Prox_Vencimento:f.venc,Data_Vencimento:f.venc?fmtD(venc):"",
     Sem_Saldo:f.saldo,Avaria:f.avaria,Tipo_Avaria:f.avaria?$("r-tipo").value:"",Foto_Avaria:R.fotos.length?R.fotos.length+(R.fotos.length>1?" fotos":" foto")+" no formulário HTML":"",
@@ -259,13 +303,13 @@ window.addEventListener("online",flush);
 
 // registros
 $("f-periodo").onchange=()=>{const d=$("f-periodo").value==="d";$("f-datas").hidden=!d;if(d&&!$("f-de").value){$("f-de").value=todayISO();$("f-ate").value=todayISO();}renderRecords();};
-$("f-quem").onchange=renderRecords;$("f-tipo").onchange=renderRecords;$("f-de").onchange=()=>{if(!$("f-ate").value||$("f-ate").value<$("f-de").value)$("f-ate").value=$("f-de").value;renderRecords();};$("f-ate").onchange=renderRecords;
+$("f-quem").onchange=renderRecords;$("f-aba").onchange=renderRecords;$("f-tipo").onchange=renderRecords;$("f-de").onchange=()=>{if(!$("f-ate").value||$("f-ate").value<$("f-de").value)$("f-ate").value=$("f-de").value;renderRecords();};$("f-ate").onchange=renderRecords;
 const dayStart=iso=>{const [y,m,d]=iso.split("-").map(Number);return new Date(y,m-1,d).getTime();};
 function allRecs(){const ids=new Set(),out=[];queue.forEach(x=>{ids.add(x.rec.ID_Auditoria);out.push(Object.assign({_pend:true},x.rec));});HIST.forEach(r=>{if(!ids.has(r.ID_Auditoria)){ids.add(r.ID_Auditoria);out.push(r);}});remote.ruas.forEach(r=>{if(!ids.has(r.ID_Auditoria))out.push(r);});return out.sort((a,b)=>b.ts-a.ts);}
-function filtered(){const pv=$("f-periodo").value,eu=$("f-quem").value==="eu",tp=$("f-tipo").value;let from=0,to=Infinity;
+function filtered(){const ab=$("f-aba").value,pv=$("f-periodo").value,eu=$("f-quem").value==="eu",tp=$("f-tipo").value;let from=0,to=Infinity;
   if(pv==="d"){const de=$("f-de").value,ate=$("f-ate").value||de;if(de){from=dayStart(de);to=dayStart(ate)+864e5;}}
   else{const days=+pv;if(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));from=d.getTime();}}
-  return allRecs().filter(r=>r.ts>=from&&r.ts<to&&(!eu||r.Matricula_Auditor===auditor)&&(tp==="todos"||(tp==="nc"?r.Possui_NC:!r.Possui_NC)));}
+  return allRecs().filter(r=>(r._aba||"ruas")===ab&&r.ts>=from&&r.ts<to&&(!eu||r.Matricula_Auditor===auditor)&&(tp==="todos"||(tp==="nc"?r.Possui_NC:!r.Possui_NC)));}
 function renderRecords(){if(typeof renderSess==="function")try{renderSess();}catch(e){}try{if(!$("v-painel").hidden)renderPainel();}catch(e){}try{paintSync();}catch(e){}
   const all=allRecs(),t0=new Date();t0.setHours(0,0,0,0);
   const ab=all.filter(r=>r.Possui_NC&&r.Status_NC!=="Resolvida");
@@ -273,11 +317,18 @@ function renderRecords(){if(typeof renderSess==="function")try{renderSess();}cat
   $("s-valor").textContent=BRL.format(ab.reduce((s,r)=>s+(+r.Valor_Divergencia||0),0)).replace(",00","");
   const list=filtered(),L=$("list");
   if(!list.length){L.innerHTML='<div class="empty">Nenhum registro com estes filtros.<br>Ajuste o período ou o tipo.</div>';return;}
-  L.innerHTML=list.slice(0,200).map(card).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
+  L.innerHTML=list.slice(0,200).map(r=>r._aba==="retorno"?cardRet(r):card(r)).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
   L.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openSessDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".pbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r)openPrint(r);});
   L.querySelectorAll(".wbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r){openPrint(r);sendWA(r,$("pv-wa"));}});
 }
+function cardRet(r){const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";const tags=[];if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Possui_NC&&!r.Prox_Vencimento)tags.push("Retorno não conforme");
+  const fotos=[r.foto_retorno,r.foto_etiqueta].filter(Boolean);
+  return '<details class="rec '+cls+'"><summary><div class="top"><span>'+esc(r.DataHora)+' · '+esc(r.Nome_Auditor)+'</span><span>'+esc(st)+'</span></div>'+
+   '<div class="addr">Rua '+esc(r.Rua)+'</div><div class="desc">'+esc(r.Produto)+' – '+esc(r.Descricao_Produto)+'</div>'+
+   '<div class="tags"><span class="tag '+cls+'">'+esc(st)+'</span>'+tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</div></summary>'+
+   '<dl><dt>ID</dt><dd>'+esc(r.ID_Auditoria)+'</dd>'+(r.Possui_NC?'<dt>Responsável</dt><dd>'+esc(r.Nome_Colaborador_NC)+' ('+esc(r.Matricula_Colaborador_NC)+')</dd>':'')+(r.Observacao?'<dt>Obs.</dt><dd>'+esc(r.Observacao)+'</dd>':'')+'</dl>'+
+   (fotos.length?'<div class="pics">'+fotos.map((s,i)=>'<img src="'+s+'" alt="'+(i?'Etiqueta':'Retorno')+'">').join("")+'</div>':'')+'</details>';}
 function card(r){
   const tags=[];if(r.Erro_Produto)tags.push("Lugar errado"+(r.Endereco_Correto?" (correto "+fmtAddr(r.Endereco_Correto)+")":""));if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Sem_Saldo)tags.push("Sem saldo");if(r.Avaria)tags.push("Avaria: "+r.Tipo_Avaria);
   const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";
@@ -291,10 +342,11 @@ const COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produt
 function cell(v){if(v===true)return "TRUE";if(v===false)return "FALSE";if(typeof v==="number")v=String(v).replace(".",",");v=v==null?"":String(v);return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].forEach(k=>o[k]=fmtAddr(o[k]));["Rua","Predio","Nivel","Apto"].forEach(k=>o[k]=unz(o[k]));
   if(typeof o.Vl_Ult_Entrada==="number")o.Vl_Ult_Entrada=Math.round(o.Vl_Ult_Entrada*100)/100;if(typeof o.Valor_Divergencia==="number")o.Valor_Divergencia=Math.round(o.Valor_Divergencia*100)/100;return o;}
-function csv(){return "\ufeff"+[COLS.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return COLS.map(c=>cell(o[c])).join(";");})).join("\r\n");}
+const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao"];
+function csv(){const cols=$("f-aba").value==="retorno"?RET_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
 $("x-ruas").onclick=async()=>{
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
-  const name="Auditoria_Ruas_"+todayISO()+".csv",data=csv();
+  const name=($("f-aba").value==="retorno"?"Auditoria_Retorno_":"Auditoria_Ruas_")+todayISO()+".csv",data=csv();
   if(downloads){try{await downloads.save({filename:name,data:new Blob([data],{type:"text/csv"})});return;}catch(e){if(e&&e.code==="declined")return;if(e&&e.code==="rate_limited"){toast("Aguarde um instante e tente de novo.");return;}}}
   if(!window.claude){try{const u=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"}));const l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast("CSV baixado.");return;}catch(e){}}
   const a=$("copy-area");a.innerHTML='<label class="lbl" for="cp">Copie o conteúdo abaixo e cole no Google Planilhas (Dados → Dividir texto em colunas, separador ponto e vírgula).</label><textarea class="in copybox" id="cp" readonly></textarea><button type="button" class="btn full" id="cpb" style="margin-top:8px">Copiar</button>';
@@ -308,7 +360,8 @@ let SHEET_URL=store.get("audcd_sheet_url","");
 if(!SHEET_URL||SHEET_OLD.includes(SHEET_URL)){SHEET_URL=SHEET_DEFAULT;store.set("audcd_sheet_url","");}
 let syncing=false,syncAgain=false,lastSheetErr="",lastSheetOk=store.get("audcd_sheet_ok","");
 const SHEET_COLS=COLS.concat(["ID_Sessao"]);
-function toSheet(r){const o=norm2(r),x={};SHEET_COLS.forEach(c=>x[c]=o[c]==null?"":o[c]);x.fotos=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);return x;}
+function toSheet(r){if(r._aba==="retorno"){const x={_aba:"retorno"};RET_COLS.forEach(c=>x[c]=r[c]==null?"":r[c]);x.foto_retorno=r.foto_retorno||"";x.foto_etiqueta=r.foto_etiqueta||"";return x;}
+  const o=norm2(r),x={_aba:"ruas"};SHEET_COLS.forEach(c=>x[c]=o[c]==null?"":o[c]);x.fotos=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);return x;}
 function sheetPending(){let n=0;HIST.forEach(r=>{if(r._sheet!==SHEET_URL)n++;});return n;}
 function paintSync(){const n=sheetPending(),l=$("sync-line");l.hidden=false;
   l.textContent=lastSheetErr?"Planilha Google: "+lastSheetErr:(n?n+" lançamento"+(n>1?"s":"")+" aguardando envio à planilha Google.":"Tudo enviado à planilha Google.");
@@ -324,7 +377,7 @@ async function postSheet(body){
   let txt="";try{txt=await r.text();}catch(e){}
   let j=null;try{j=JSON.parse(txt);}catch(e){}
   if(j&&j.ok)return {ok:true,confirmado:true,adicionados:j.adicionados};
-  if(j&&j.erro)throw new Error(j.erro);
+  if(j&&j.erro){if(j.login&&!DEMO)setTimeout(revalidar,100);throw new Error(j.erro);}
   if(/<html|<!DOCTYPE/i.test(txt))throw new Error("o Apps Script respondeu com página de erro ou de login. Confira: código completo colado (função doPost), implantação como App da Web com Quem pode acessar = Qualquer pessoa.");
   throw new Error("resposta inesperada da planilha (HTTP "+r.status+").");
 }
@@ -336,7 +389,8 @@ async function sheetSync(all){
     do{syncAgain=false;
       const list=[...HIST.values()].filter(r=>all||r._sheet!==SHEET_URL).sort((a,b)=>a.ts-b.ts);all=false;
       for(let i=0;i<list.length;i+=3){const batch=list.slice(i,i+3);
-        const res=await postSheet(JSON.stringify({records:batch.map(toSheet)}));
+        if(!DEMO&&!(LOGIN&&LOGIN.token))throw new Error("faça login para enviar.");
+        const res=await postSheet(JSON.stringify({token:LOGIN&&LOGIN.token,records:batch.map(toSheet)}));
         for(const r of batch){r._sheet=SHEET_URL;await histPut(r);sent++;}
         lastSheetErr="";if(res.confirmado){lastSheetOk=fmtDT(new Date()).slice(0,16);store.set("audcd_sheet_ok",lastSheetOk);}
       }
@@ -539,7 +593,7 @@ async function carregarPainel(manual){
   if(!SHEET_URL||window.claude){PAINEL_INFO=window.claude?"Pelo link do Claude o painel não acessa a planilha. Use o site.":"Planilha não configurada.";renderPainel();return;}
   if(!navigator.onLine){PAINEL_INFO=PAINEL_ROWS?"Sem internet: mostrando a última cópia da planilha.":"Sem internet.";renderPainel();return;}
   painelBusy=true;const inf=$("pn-info");if(inf)inf.textContent="Atualizando com a planilha…";
-  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=registros&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=registros&token="+encodeURIComponent((LOGIN&&LOGIN.token)||"")+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
     if(j&&j.ok&&Array.isArray(j.registros)){PAINEL_ROWS=j.registros.map(row=>{const o={};j.colunas.forEach((c,i)=>o[c]=row[i]);return o;});aplicarQuadroPlanilha(j.quadro);
       PAINEL_INFO="Planilha Google ("+PAINEL_ROWS.length+" lançamentos) · "+fmtDT(new Date()).slice(0,16);IDB.set("painel_cache",{rows:PAINEL_ROWS,info:PAINEL_INFO,quadro:j.quadro||null}).catch(()=>{});
       if(manual)toast("Painel atualizado com a planilha.");}
@@ -549,6 +603,51 @@ async function carregarPainel(manual){
 }
 IDB.get("painel_cache").then(c=>{if(c&&c.rows&&!PAINEL_ROWS){PAINEL_ROWS=c.rows;aplicarQuadroPlanilha(c.quadro);PAINEL_INFO="Última cópia da planilha: "+String(c.info||"").split("· ").pop();}}).catch(()=>{});
 setInterval(()=>{if(!$("v-painel").hidden&&navigator.onLine&&!document.hidden)carregarPainel();},120000);
+
+// auditoria de retorno
+const RT={prod:null,venc:false,nc:false,fr:"",fe:""};
+const tProd=picker($("t-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{RT.prod=k;if(k!=null){const pk=eByProd.get(P.cod[k]);if(pk!=null){$("t-rua").value=E.pt[pk][0];autoRepRT(true);}}paintRT();}});
+const tRep=picker($("t-rep"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab});
+function ruaRT(){return String(parseInt(String($("t-rua").value).replace(/\D/g,""),10)||"");}
+function autoRepRT(force){const reps=repsDaRua(ruaRT()).filter(m=>cIdx.has(m));if(reps.length&&(force||tRep.value==null))tRep.set(cIdx.get(reps[0]));
+  $("t-rep-h").textContent=reps.length?"Pelo quadro da rua "+ruaRT()+": "+reps.map(m=>curto(nomeC(m))).join(" e ")+".":(ruaRT()?"Rua sem repositor no quadro.":"");}
+$("t-rua").addEventListener("input",()=>autoRepRT(true));
+document.querySelectorAll(".tg[data-t]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.t;RT[k]=!RT[k];b.setAttribute("aria-pressed",RT[k]);if(RT.venc||RT.nc)autoRepRT(false);paintRT();}));
+function fotoRT(campo,input){input.addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{RT[campo]=await compress(f);paintRT();setErr(campo==="fr"?"t-fr-f":"t-fe-f","");}catch(x){toast("Não foi possível ler a foto.");}});}
+fotoRT("fr",$("t-fr-in"));fotoRT("fr",$("t-fr-g"));fotoRT("fe",$("t-fe-in"));fotoRT("fe",$("t-fe-g"));
+function fotoBox(campo){const s=RT[campo];const el=$(campo==="fr"?"t-fr":"t-fe");el.innerHTML=s?'<span class="ph-it"><img src="'+s+'" alt="Prévia"><button type="button" aria-label="Remover foto">×</button></span>':"";
+  if(s)el.querySelector("button").onclick=()=>{RT[campo]="";paintRT();};
+  $(campo==="fr"?"t-fr-cam":"t-fe-cam").hidden=!!s;$(campo==="fr"?"t-fr-gal":"t-fe-gal").hidden=!!s;}
+function paintRT(){if(!$("t-info"))return;const k=RT.prod;
+  if(k!=null){const pk=eByProd.get(P.cod[k]);$("t-info").innerHTML=pk!=null?rackHTML(pk,"Endereço de picking do item",null,'<div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span>'+(E.qt[pk]?'<span>'+E.qt[pk]+' un/cx</span>':'')+'</div>'):'<div class="rack empty">Item sem endereço na base 8022. Informe a rua.</div>';}
+  else $("t-info").innerHTML="";
+  const nc=RT.venc||RT.nc;$("t-sub-venc").hidden=!RT.venc;$("t-nc").hidden=!nc;
+  const v=$("t-verdict");v.className="verdict "+(nc?"nc":"ok");v.textContent=nc?"Não conformidade – status Aberta":"Retorno conforme";
+  $("t-fr-f").querySelector(".lbl").innerHTML="Foto do retorno"+(RT.nc?" <small>(obrigatória)</small>":" <small>(opcional)</small>");
+  fotoBox("fr");fotoBox("fe");listaRT();}
+function listaRT(){const t0=new Date();t0.setHours(0,0,0,0);const L=allRecs().filter(r=>r._aba==="retorno"&&r.ts>=t0.getTime()&&r.Matricula_Auditor===auditor);
+  $("t-list").innerHTML=L.length?'<div class="block"><h3>Retornos de hoje <small>'+L.length+'</small></h3>'+L.map(r=>'<div class="rt-item"><div><b>'+esc(r.Produto)+'</b> – '+esc(r.Descricao_Produto)+'<div class="tags">'+(r.Possui_NC?'<span class="tag nc">'+(r.Prox_Vencimento?'Vence '+esc(r.Data_Vencimento):'Não conforme')+'</span>':'<span class="tag ok">Conforme</span>')+'<span class="tag">Rua '+esc(r.Rua)+'</span></div></div><div class="sm" style="white-space:nowrap;color:var(--muted)">'+esc(String(r.DataHora).slice(11,16))+'</div></div>').join("")+'</div>':"";}
+function resetRT(){tProd.clear();tRep.clear();RT.prod=null;RT.venc=false;RT.nc=false;RT.fr="";RT.fe="";$("t-rua").value="";$("t-venc").value="";$("t-obs").value="";$("t-rep-h").textContent="";
+  document.querySelectorAll(".tg[data-t]").forEach(b=>b.setAttribute("aria-pressed","false"));document.querySelectorAll("#v-retorno .field.bad").forEach(f=>setErr(f.id,""));paintRT();}
+$("t-save").addEventListener("click",async()=>{
+  if(!auditor){toast("Faça login primeiro.");return;}
+  const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const nc=RT.venc||RT.nc,rua=ruaRT(),venc=$("t-venc").value,obs=$("t-obs").value.trim();
+  chk(RT.prod==null,"t-prod-f","Escolha o produto.");
+  chk(!rua,"t-rua-f","Informe a rua.");
+  chk(RT.venc&&!venc,"t-venc-f","Informe a data de vencimento.");
+  chk(nc&&tRep.value==null,"t-rep-f","Informe o colaborador responsável.");
+  chk(RT.nc&&!RT.fr,"t-fr-f","Tire a foto do retorno.");
+  chk(RT.nc&&!obs,"t-obs-f","Descreva o que está errado no retorno.");
+  if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
+  const now=new Date(),ri=tRep.value,k=RT.prod,dia=String(now.getFullYear())+pad(now.getMonth()+1)+pad(now.getDate());
+  const rec={_aba:"retorno",ID_Auditoria:newId("RT"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),
+    Produto:P.cod[k],Descricao_Produto:P.desc[k],Rua:rua,Prox_Vencimento:RT.venc,Data_Vencimento:RT.venc?fmtD(venc):"",
+    Foto_Retorno:RT.fr?"1 foto":"",Foto_Etiqueta:RT.fe?"1 foto":"",Observacao:obs,Possui_NC:nc,
+    Matricula_Colaborador_NC:nc?C.mat[ri]:"",Nome_Colaborador_NC:nc?C.nome[ri]:"",Funcao_Colaborador_NC:nc?C.fun[ri]:"",
+    Status_NC:nc?"Aberta":"Conforme",Responsavel_Tratativa:"",ID_Sessao:"RET-"+dia+"-"+auditor,foto_retorno:RT.fr,foto_etiqueta:RT.fe};
+  $("t-save").disabled=true;const ok=await saveRec(rec);$("t-save").disabled=false;
+  resetRT();window.scrollTo(0,0);toast((ok||dbState==="off"?"Retorno salvo":"Salvo neste aparelho, envio pendente")+(nc?" – NC aberta.":" – conforme."));tProd.focus();
+});
 
 // modo offline (site)
 if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
@@ -584,8 +683,8 @@ function renderSess(){
       if(!rua||!RUAS.has(rua)){setErr("ss-rua-f","Rua não encontrada na base de endereços.");bad=true;}else setErr("ss-rua-f","");
       if(sp.value==null){setErr("ss-rep-f","Informe o repositor da rua.");bad=true;}else setErr("ss-rep-f","");
       if(bad)return;
-      const ci=sp.value,ai=cIdx.get(auditor);
-      S={id:newId("R"+rua),rua,rep:C.mat[ci],repNome:C.nome[ci],repFun:C.fun[ci],aud:auditor,audNome:C.nome[ai],ini:Date.now()};
+      const ci=sp.value;
+      S={id:newId("R"+rua),rua,rep:C.mat[ci],repNome:C.nome[ci],repFun:C.fun[ci],aud:auditor,audNome:nomeAud(),ini:Date.now()};
       store.set("audcd_sessao",S);setMode("end");reset();renderSess();toast("Rua "+rua+" iniciada. Lance os endereços.");rEnd.focus();
     };
     return;
@@ -758,6 +857,7 @@ function openPrint(r){openDoc({html:docHTML(r),multi:false,name:"NC_"+r.ID_Audit
 function openSessDoc(S,recs,onClose){const ncs=recs.filter(r=>r.Possui_NC);
   openDoc({html:sessDocHTML(S,recs),multi:true,name:"NC_Rua"+S.rua+"_"+S.id+".pdf",title:"Não conformidades – Rua "+S.rua,
     short:"Não conformidades – Rua "+S.rua+" – "+ncs.length+" NC – "+BRL.format(ncs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0)),text:sessText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
-if(S){setMode("end");reset();}renderSess();paintFotos();paintConn();paintPend();renderRecords();go((location.hash||"").slice(1));
+if(S){setMode("end");reset();}renderSess();paintFotos();paintConn();paintPend();aplicarPerms();renderRecords();
+if(!DEMO&&!LOGIN){mostrarLogin();}else{go((location.hash||"").slice(1));setTimeout(revalidar,800);}
 
 })();

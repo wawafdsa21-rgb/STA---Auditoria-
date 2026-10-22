@@ -78,6 +78,7 @@
       <div class="stat"><b id="s-valor">R$ 0</b><span>em NC abertas</span></div>
     </div>
     <div class="filters">
+      <select class="in" id="f-aba" aria-label="Tipo de auditoria"><option value="ruas">Auditoria de ruas</option><option value="retorno">Auditoria de retorno</option></select>
       <select class="in" id="f-periodo" aria-label="Período"><option value="1">Hoje</option><option value="7" selected>Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="0">Tudo</option><option value="d">Escolher data</option></select>
       <select class="in" id="f-tipo" aria-label="Tipo"><option value="todos">Todos os lançamentos</option><option value="nc" selected>Só não conformidades</option><option value="ok">Só conformes</option></select>
       <select class="in" id="f-quem" aria-label="Auditor"><option value="eu">Só os meus</option><option value="todos" selected>Todos os auditores</option></select>
@@ -90,10 +91,39 @@
     <div id="pend-box"></div>
     <div id="list"></div>
     <div class="export">
-      <button type="button" class="btn full" id="x-ruas">Baixar CSV – Auditoria_Ruas</button>
+      <button type="button" class="btn full" id="x-ruas">Baixar CSV</button>
       <p class="note">O CSV respeita o período e o filtro acima, com as mesmas colunas da planilha. No Google Planilhas: Arquivo → Importar → Anexar à planilha atual, separador ponto e vírgula.</p>
       <div id="copy-area"></div>
     </div>
+  </section>
+
+  <section class="view" id="v-retorno" hidden>
+    <div class="block">
+      <div class="field" id="t-prod-f"><label>Produto do retorno</label><div id="t-prod"></div></div>
+      <div id="t-info"></div>
+      <div class="field" id="t-rua-f"><label for="t-rua">Rua</label><input class="in" id="t-rua" inputmode="numeric" placeholder="Ex.: 44"><div class="hint" id="t-rua-h">Preenchida pelo endereço de picking do item (8022). Pode alterar.</div></div>
+    </div>
+    <div class="block">
+      <h3>Conferência <small>toque para marcar</small></h3>
+      <div class="toggles">
+        <button type="button" class="tg" data-t="venc" aria-pressed="false"><i class="box"></i>Próximo do vencimento</button>
+        <button type="button" class="tg" data-t="nc" aria-pressed="false"><i class="box"></i>Retorno não conforme</button>
+      </div>
+      <div class="sub" id="t-sub-venc" hidden><div class="field" id="t-venc-f"><label for="t-venc">Data de vencimento</label><input class="in" type="date" id="t-venc"></div></div>
+      <div class="verdict ok" id="t-verdict">Retorno conforme</div>
+      <div id="t-nc" hidden><div class="field" id="t-rep-f"><label>Colaborador responsável</label><div id="t-rep"></div><div class="hint" id="t-rep-h"></div></div></div>
+    </div>
+    <div class="block">
+      <div class="field" id="t-fr-f"><span class="lbl">Foto do retorno</span><div class="ph1"><span id="t-fr"></span><label class="filebtn" id="t-fr-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="t-fr-in"></label><label class="filebtn" id="t-fr-gal">Galeria<input type="file" accept="image/*" id="t-fr-g"></label></div></div>
+      <div class="field" id="t-fe-f"><span class="lbl">Foto da etiqueta</span><div class="ph1"><span id="t-fe"></span><label class="filebtn" id="t-fe-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="t-fe-in"></label><label class="filebtn" id="t-fe-gal">Galeria<input type="file" accept="image/*" id="t-fe-g"></label></div></div>
+      <div class="field" id="t-obs-f"><label for="t-obs">Observação</label><textarea class="in" id="t-obs" placeholder="O que foi encontrado no retorno"></textarea></div>
+    </div>
+    <button type="button" class="save" id="t-save">Salvar retorno</button>
+    <div id="t-list" style="margin-top:12px"></div>
+  </section>
+
+  <section class="view" id="v-cargas" hidden>
+    <div class="empty">A auditoria de cargas está em preparação.<br>Assim que as colunas da aba Auditoria_Cargas forem definidas, ela aparece aqui.</div>
   </section>
 
   <section class="view" id="v-painel" hidden><div id="painel"></div></section>
@@ -139,7 +169,9 @@
 </main>
 
 <nav aria-label="Seções">
-  <button type="button" data-v="ruas" aria-current="page">Auditar</button>
+  <button type="button" data-v="ruas" aria-current="page">Ruas</button>
+  <button type="button" data-v="retorno" hidden>Retorno</button>
+  <button type="button" data-v="cargas" hidden>Cargas</button>
   <button type="button" data-v="registros">Registros<span class="badge" id="nav-pend" hidden></span></button>
   <button type="button" data-v="painel">Painel</button>
   <button type="button" data-v="bases">Bases</button>
@@ -152,6 +184,18 @@
     <div id="sh-pick"></div>
     <p class="hint" style="margin-top:12px">Para trocar depois, toque no seu nome no topo.</p>
   </div>
+</div>
+<div class="login" id="login" hidden role="dialog" aria-modal="true" aria-labelledby="lg-t">
+  <img id="lg-logo" alt="Santa Therezinha">
+  <div class="lg-box">
+    <h1 id="lg-t">Auditoria STA</h1>
+    <p>Entre com sua matrícula e senha.</p>
+    <div class="field" id="lg-mat-f"><label for="lg-mat">Matrícula</label><input class="in" id="lg-mat" inputmode="numeric" autocomplete="username" enterkeyhint="next"></div>
+    <div class="field" id="lg-sen-f"><label for="lg-sen">Senha</label><input class="in" id="lg-sen" type="password" autocomplete="current-password" enterkeyhint="go"></div>
+    <button type="button" class="save" id="lg-go" style="margin-top:16px">Entrar</button>
+    <p class="lg-msg" id="lg-msg" role="alert"></p>
+  </div>
+  <p class="lg-foot">O acesso segue a aba Permissionamento da planilha. Depois do primeiro login com internet, o aparelho também entra sem sinal.</p>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
