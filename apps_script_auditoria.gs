@@ -1,9 +1,10 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 6)
+ * Auditoria STA – Santa Therezinha (versão 7)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
- * Login pela aba Permissionamento (Matrícula, Permissão, Observação, Senha).
+ * Login pela aba Permissionamento (Matrícula, Permissão, Observação, Senha, Status).
+ * Quem tem a permissão aud_adm administra os acessos pelo aplicativo.
  * Fotos vão para a pasta "Fotos Auditoria de Ruas" no Google Drive.
  *
  * Implantar → Gerenciar implantações → lápis → Nova versão
@@ -50,6 +51,17 @@ function doPost(e) {
   const sessao = validarToken(dados.token);
   if (!sessao.ok) return resposta({ ok: false, erro: sessao.erro, login: true });
 
+  if (String(dados.acao || '').indexOf('admin_') === 0) {
+    if (sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Sem permissão de administração (aud_adm).' });
+    const lk = LockService.getScriptLock(); lk.waitLock(30000);
+    try {
+      if (dados.acao === 'admin_listar') return resposta(adminListar());
+      if (dados.acao === 'admin_salvar') return resposta(adminSalvar(dados, sessao));
+      return resposta({ ok: false, erro: 'Ação desconhecida.' });
+    } catch (err) { return resposta({ ok: false, erro: String(err.message || err) }); }
+    finally { lk.releaseLock(); }
+  }
+
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -86,7 +98,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 6, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 7, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -98,24 +110,43 @@ function normalizar(s) {
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-/** Lê a aba Permissionamento: { matricula: { senhas[], permissoes[] } }. */
-function lerPermissoes() {
+const PERMISSOES_CONHECIDAS = {
+  aud_rua: 'Acesso a aba de auditoria_ruas',
+  aud_ret: 'Acesso a aba de auditoria_retorno',
+  aud_car: 'Acesso a aba de auditoria_cargas',
+  aud_adm: 'Acesso a tela de administracao'
+};
+
+/** Lê a aba Permissionamento (cria a coluna Status se não existir). */
+function tabelaPermissoes() {
   const sh = abrirPlanilha().getSheetByName(ABA_PERMISSOES);
-  if (!sh || sh.getLastRow() < 2) return {};
-  const v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues();
-  const cab = v[0].map(normalizar);
-  const iMat = cab.findIndex(function (h) { return h.indexOf('MATRIC') === 0; });
-  const iPer = cab.findIndex(function (h) { return h.indexOf('PERMISS') === 0; });
-  const iSen = cab.findIndex(function (h) { return h.indexOf('SENHA') === 0; });
-  if (iMat < 0 || iPer < 0 || iSen < 0) throw new Error('A aba Permissionamento precisa das colunas Matrícula, Permissão e Senha.');
-  const mapa = {};
-  for (let i = 1; i < v.length; i++) {
-    const mat = String(v[i][iMat]).trim(), per = String(v[i][iPer]).trim().toLowerCase(), sen = String(v[i][iSen]).trim();
-    if (!mat || !per) continue;
+  if (!sh) throw new Error('Aba Permissionamento não encontrada.');
+  let ultCol = Math.max(sh.getLastColumn(), 1);
+  const cab = sh.getRange(1, 1, 1, ultCol).getDisplayValues()[0].map(normalizar);
+  const achar = function (p) { return cab.findIndex(function (h) { return h.indexOf(p) === 0; }); };
+  const T = { sh: sh, iMat: achar('MATRIC'), iPer: achar('PERMISS'), iObs: achar('OBSERV'), iSen: achar('SENHA'), iSta: achar('STATUS') };
+  if (T.iMat < 0 || T.iPer < 0 || T.iSen < 0) throw new Error('A aba Permissionamento precisa das colunas Matrícula, Permissão e Senha.');
+  if (T.iSta < 0) {
+    T.iSta = ultCol; sh.getRange(1, ultCol + 1).setValue('Status').setFontWeight('bold'); ultCol++;
+    if (sh.getLastRow() > 1) sh.getRange(2, ultCol, sh.getLastRow() - 1, 1).setValue('Ativo');
+  }
+  T.ultCol = ultCol;
+  T.linhas = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, ultCol).getDisplayValues() : [];
+  return T;
+}
+
+const bloqueado = function (s) { return normalizar(s) === 'BLOQUEADO'; };
+
+/** { matricula: { senhas[], permissoes[] } } só com linhas ativas. */
+function lerPermissoes() {
+  const T = tabelaPermissoes(), mapa = {};
+  T.linhas.forEach(function (l) {
+    const mat = String(l[T.iMat]).trim(), per = String(l[T.iPer]).trim().toLowerCase(), sen = String(l[T.iSen]).trim();
+    if (!mat || !per || bloqueado(l[T.iSta])) return;
     const m = mapa[mat] = mapa[mat] || { senhas: [], permissoes: [] };
     if (sen && m.senhas.indexOf(sen) < 0) m.senhas.push(sen);
     if (m.permissoes.indexOf(per) < 0) m.permissoes.push(per);
-  }
+  });
   return mapa;
 }
 
@@ -123,7 +154,12 @@ function login(matricula, senha) {
   const mat = String(matricula || '').trim(), sen = String(senha || '').trim();
   if (!mat || !sen) return { ok: false, erro: 'Informe matrícula e senha.' };
   const u = lerPermissoes()[mat];
-  if (!u || u.senhas.indexOf(sen) < 0) return { ok: false, erro: 'Matrícula ou senha inválidas.' };
+  if (!u) {
+    const T = tabelaPermissoes();
+    const existe = T.linhas.some(function (l) { return String(l[T.iMat]).trim() === mat; });
+    return { ok: false, erro: existe ? 'Acesso bloqueado. Fale com o administrador.' : 'Matrícula ou senha inválidas.' };
+  }
+  if (u.senhas.indexOf(sen) < 0) return { ok: false, erro: 'Matrícula ou senha inválidas.' };
   return { ok: true, matricula: mat, nome: nomeDaMatricula(mat), permissoes: u.permissoes, token: gerarToken(mat) };
 }
 
@@ -163,6 +199,52 @@ function nomeDaMatricula(mat) {
     for (let i = 0; i < v.length; i++) if (String(v[i][0]).trim() === mat) return String(v[i][1]).trim();
   } catch (e) {}
   return '';
+}
+
+/* ===================== Administração (aud_adm) ===================== */
+
+function adminListar() {
+  const T = tabelaPermissoes(), us = {};
+  T.linhas.forEach(function (l) {
+    const mat = String(l[T.iMat]).trim(), per = String(l[T.iPer]).trim().toLowerCase();
+    if (!mat || !per) return;
+    const u = us[mat] = us[mat] || { matricula: mat, senha: '', nome: '', perms: {} };
+    if (!u.senha) u.senha = String(l[T.iSen]).trim();
+    u.perms[per] = bloqueado(l[T.iSta]) ? 'Bloqueado' : 'Ativo';
+  });
+  const lista = Object.keys(us).map(function (m) { us[m].nome = nomeDaMatricula(m); return us[m]; })
+    .sort(function (a, b) { return (a.nome || a.matricula).localeCompare(b.nome || b.matricula); });
+  return { ok: true, usuarios: lista, permissoes: Object.keys(PERMISSOES_CONHECIDAS) };
+}
+
+function adminSalvar(d, sessao) {
+  const orig = String(d.original || '').trim(), mat = String(d.matricula || '').replace(/\D/g, ''), sen = String(d.senha || '').trim();
+  const perms = d.perms || {};
+  if (!mat) throw new Error('Informe a matrícula.');
+  if (sen.length < 4) throw new Error('A senha precisa ter ao menos 4 caracteres.');
+  if (orig === sessao.matricula && perms.aud_adm !== true) throw new Error('Você não pode tirar o seu próprio acesso de administração.');
+  const T = tabelaPermissoes(), sh = T.sh;
+  if (mat !== orig && T.linhas.some(function (l) { return String(l[T.iMat]).trim() === mat; })) throw new Error('Já existe um acesso com a matrícula ' + mat + '.');
+  const existentes = {};
+  if (orig) T.linhas.forEach(function (l, i) { if (String(l[T.iMat]).trim() === orig) existentes[String(l[T.iPer]).trim().toLowerCase()] = i + 2; });
+  if (orig && !Object.keys(existentes).length) throw new Error('Matrícula ' + orig + ' não encontrada na planilha.');
+  if (!orig && !Object.keys(perms).some(function (p) { return perms[p] === true; })) throw new Error('Libere ao menos um acesso.');
+
+  Object.keys(existentes).forEach(function (per) {
+    const lin = existentes[per];
+    sh.getRange(lin, T.iMat + 1).setNumberFormat('@').setValue(mat);
+    sh.getRange(lin, T.iSen + 1).setNumberFormat('@').setValue(sen);
+    if (per in perms) sh.getRange(lin, T.iSta + 1).setValue(perms[per] === true ? 'Ativo' : 'Bloqueado');
+  });
+  Object.keys(perms).forEach(function (per) {
+    if (perms[per] !== true || existentes[per]) return;
+    const linha = new Array(T.ultCol).fill('');
+    linha[T.iMat] = mat; linha[T.iPer] = per; linha[T.iSen] = sen; linha[T.iSta] = 'Ativo';
+    if (T.iObs >= 0) linha[T.iObs] = PERMISSOES_CONHECIDAS[per] || '';
+    const n = sh.getLastRow() + 1;
+    sh.getRange(n, 1, 1, T.ultCol).setNumberFormat('@').setValues([linha]);
+  });
+  return { ok: true };
 }
 
 /** Rode se precisar derrubar todos os logins (todos terão de entrar de novo). */

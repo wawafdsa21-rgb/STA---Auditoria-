@@ -107,7 +107,7 @@ let queue=store.get("audcd_fila",[]).filter(x=>x.col==="ruas");
 // login e permissões
 const DEMO=!!window.claude;
 let LOGIN=DEMO?{demo:true,perms:["aud_rua","aud_ret","aud_car"]}:store.get("audcd_login",null);
-const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car"};
+const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car",admin:"aud_adm"};
 const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
 const podeVer=v=>!VIEW_PERM[v]||temPerm(VIEW_PERM[v]);
 function primeiraTela(){return ["ruas","retorno","cargas"].find(podeVer)||"registros";}
@@ -135,7 +135,7 @@ async function fazerLogin(){
     lgMsg(navigator.onLine?"Não foi possível falar com a planilha agora. Tente de novo.":(c?"Senha diferente da última usada neste aparelho.":"Sem internet: este aparelho ainda não tem acesso salvo para essa matrícula."));
   }finally{bt.disabled=false;bt.textContent="Entrar";}
 }
-function sair(){if(!confirm("Sair da conta de "+curtoNome(nomeAud())+"?"))return;LOGIN=null;store.set("audcd_login",null);auditor=null;mostrarLogin();}
+function sair(){$("menu").hidden=true;if(!confirm("Sair da conta de "+curtoNome(nomeAud())+"?"))return;LOGIN=null;store.set("audcd_login",null);auditor=null;mostrarLogin();}
 const curtoNome=n=>{const p=String(n||"").trim().split(/\s+/);return p.length>1?p[0]+" "+p[p.length-1]:String(n||"");};
 function mostrarLogin(){const hl=document.querySelector("header img");if(hl&&hl.src)$("lg-logo").src=hl.src;$("login").hidden=false;setTimeout(()=>$("lg-mat").focus(),50);}
 $("lg-go").onclick=fazerLogin;
@@ -153,13 +153,17 @@ if(DEMO&&auditor!=null&&!cIdx.has(auditor)) auditor=null;
 const shPick=picker($("sh-pick"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab,onPick:k=>{if(k==null)return;auditor=C.mat[k];store.set("audcd_auditor",auditor);paintWho();$("sheet").hidden=true;renderRecords();toast("Olá, "+C.nome[k].split(" ")[0]+".");}});
 function nomeAud(){if(LOGIN&&!LOGIN.demo&&LOGIN.nome)return LOGIN.nome;return auditor&&cIdx.has(auditor)?C.nome[cIdx.get(auditor)]:(auditor||"");}
 function paintWho(){$("whoName").textContent=auditor?nomeAud()+" · "+auditor:"Identificar auditor";}
-$("whoBtn").addEventListener("click",()=>{if(!DEMO){if(LOGIN)sair();return;}shPick.clear();$("sheet").hidden=false;shPick.focus();});
+function abrirMenu(){$("mn-t").textContent=nomeAud()||"Conta";$("mn-sub").textContent="Matrícula "+(LOGIN.mat||"")+" · acessos: "+(LOGIN.perms||[]).map(p=>PERM_NOME[p]||p).join(", ");
+  $("mn-adm").hidden=!temPerm("aud_adm");$("menu").hidden=false;}
+$("mn-x").onclick=()=>{$("menu").hidden=true;};$("mn-sair").onclick=sair;$("mn-adm").onclick=()=>{$("menu").hidden=true;go("admin");};
+$("menu").addEventListener("click",e=>{if(e.target.id==="menu")$("menu").hidden=true;});
+$("whoBtn").addEventListener("click",()=>{if(!DEMO){if(LOGIN)abrirMenu();return;}shPick.clear();$("sheet").hidden=false;shPick.focus();});
 $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("sheet").hidden=true;});
 paintWho(); if(DEMO&&!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Confira o retorno do repositor, com foto do produto e da etiqueta."],cargas:["Auditoria de cargas","Em preparação."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
-function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();["ruas","retorno","cargas","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Confira o retorno do repositor, com foto do produto e da etiqueta."],cargas:["Auditoria de cargas","Em preparação."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();["ruas","retorno","cargas","admin","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="admin")carregarAdmin();if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
@@ -603,6 +607,66 @@ async function carregarPainel(manual){
 }
 IDB.get("painel_cache").then(c=>{if(c&&c.rows&&!PAINEL_ROWS){PAINEL_ROWS=c.rows;aplicarQuadroPlanilha(c.quadro);PAINEL_INFO="Última cópia da planilha: "+String(c.info||"").split("· ").pop();}}).catch(()=>{});
 setInterval(()=>{if(!$("v-painel").hidden&&navigator.onLine&&!document.hidden)carregarPainel();},120000);
+
+// administração de acessos
+const PERM_NOME={aud_rua:"Ruas",aud_ret:"Retorno",aud_car:"Cargas",aud_adm:"Administração"};
+const PERM_DESC={aud_rua:"Auditoria de ruas",aud_ret:"Auditoria de retorno",aud_car:"Auditoria de cargas",aud_adm:"Esta tela"};
+let ADM={lista:null,perms:["aud_rua","aud_ret","aud_car","aud_adm"],filtro:"",novo:false,msg:"",busy:false};
+async function admPost(body){const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({token:LOGIN&&LOGIN.token},body)),redirect:"follow",cache:"no-store"});
+  let j=null;try{j=await r.json();}catch(e){throw new Error("O Apps Script não respondeu. Confira se a versão 7 está implantada.");}if(!j.ok)throw new Error(j.erro||"Erro na planilha.");return j;}
+async function carregarAdmin(){const box=$("adm");if(!temPerm("aud_adm")){box.innerHTML='<div class="empty">Sem permissão de administração.</div>';return;}
+  if(DEMO){box.innerHTML='<div class="empty">A administração funciona pelo site, com login.</div>';return;}
+  if(!navigator.onLine){box.innerHTML='<div class="empty">A administração precisa de internet para ler a aba Permissionamento.</div>';return;}
+  if(!ADM.lista)box.innerHTML='<div class="empty">Carregando usuários da planilha…</div>';
+  try{const j=await admPost({acao:"admin_listar"});ADM.lista=j.usuarios||[];if(j.permissoes&&j.permissoes.length)ADM.perms=j.permissoes;ADM.msg="";}catch(e){ADM.msg=e.message;}
+  renderAdmin();}
+function swHTML(per,on,st){return '<button type="button" class="sw" data-p="'+esc(per)+'" aria-pressed="'+on+'"><span>'+esc(PERM_NOME[per]||per)+'<small>'+(st==="Bloqueado"?"bloqueado":on?"liberado":"sem acesso")+'</small></span><i aria-hidden="true"></i></button>';}
+function cardUsuario(u,idx){const ativo=Object.values(u.perms).some(s=>s==="Ativo");const nome=u.nome||(cIdx.has(u.matricula)?C.nome[cIdx.get(u.matricula)]:"");
+  const perms=[...new Set(ADM.perms.concat(Object.keys(u.perms)))];
+  return '<div class="block au" data-i="'+idx+'"><div class="au-h"><div><b>'+esc(nome||"Sem nome no quadro")+'</b><small>'+(u.matricula===LOGIN.mat?"você · ":"")+Object.keys(u.perms).length+' linha'+(Object.keys(u.perms).length>1?'s':'')+' na planilha</small></div><span class="chip '+(ativo?'on':'off')+'">'+(ativo?'Ativo':'Bloqueado')+'</span></div>'+
+    '<div class="au-f"><div><label>Login (matrícula)</label><input class="in" data-f="mat" inputmode="numeric" value="'+esc(u.matricula)+'"></div>'+
+    '<div><label>Senha</label><div class="pw"><input class="in" data-f="sen" type="password" value="'+esc(u.senha)+'" autocomplete="off"><button type="button" data-f="ver" aria-label="Mostrar senha">ver</button></div></div></div>'+
+    '<div class="sws">'+perms.map(p=>swHTML(p,u.perms[p]==="Ativo",u.perms[p])).join("")+'</div>'+
+    '<div class="au-b"><button type="button" class="btn" data-f="tudo">'+(ativo?'Bloquear tudo':'Liberar acessos')+'</button><button type="button" class="save" data-f="salvar" style="min-height:48px;font-size:1.15rem;margin:0" disabled>Salvar</button></div></div>';}
+function renderAdmin(){const box=$("adm");if(!ADM.lista){box.innerHTML='<div class="empty">'+esc(ADM.msg||"Não foi possível carregar.")+'<br><button type="button" class="btn" id="adm-rt" style="margin-top:10px">Tentar de novo</button></div>';$("adm-rt").onclick=carregarAdmin;return;}
+  const f=norm(ADM.filtro||"");const L=ADM.lista.map((u,i)=>[u,i]).filter(([u])=>!f||u.matricula.includes(f)||norm(u.nome||(cIdx.has(u.matricula)?C.nome[cIdx.get(u.matricula)]:"")).includes(f));
+  let h=(ADM.msg?'<p class="err" style="margin:0 0 10px">'+esc(ADM.msg)+'</p>':'')+
+    '<div class="adm-top"><input class="in" id="adm-q" type="search" placeholder="Buscar matrícula ou nome" value="'+esc(ADM.filtro)+'"><button type="button" class="btn" id="adm-novo">+ Novo</button></div>'+
+    '<p class="note" style="margin:-4px 0 10px">'+ADM.lista.length+' usuário'+(ADM.lista.length!==1?'s':'')+'. As alterações são gravadas na aba <b>Permissionamento</b>. Bloquear mantém a linha na planilha com Status = Bloqueado.</p>';
+  if(ADM.novo)h+='<div class="block au dirty" id="adm-new"><div class="au-h"><b>Novo usuário</b></div><div class="field" style="margin:0 0 8px"><label>Colaborador</label><div id="an-pick"></div></div>'+
+    '<div class="au-f"><div><label>Login (matrícula)</label><input class="in" id="an-mat" inputmode="numeric"></div><div><label>Senha</label><input class="in" id="an-sen" autocomplete="off"></div></div>'+
+    '<div class="sws">'+ADM.perms.map(p=>swHTML(p,false,"")).join("")+'</div>'+
+    '<div class="au-b"><button type="button" class="btn" id="an-x">Cancelar</button><button type="button" class="save" id="an-ok" style="min-height:48px;font-size:1.15rem;margin:0">Criar acesso</button></div></div>';
+  h+=L.length?L.map(([u,i])=>cardUsuario(u,i)).join(""):'<div class="empty">Nenhum usuário encontrado.</div>';
+  box.innerHTML=h;
+  $("adm-q").oninput=e=>{ADM.filtro=e.target.value;const pos=e.target.selectionStart;renderAdmin();const q=$("adm-q");q.focus();try{q.setSelectionRange(pos,pos);}catch(x){}};
+  $("adm-novo").onclick=()=>{ADM.novo=true;renderAdmin();$("an-mat").focus();};
+  if(ADM.novo){const nb=$("adm-new");const pk=picker($("an-pick"),{ph:"Buscar no quadro (opcional)",search:searchColab,describe:descColab,onPick:k=>{if(k!=null){$("an-mat").value=C.mat[k];const s="aud"+C.mat[k].slice(-4);if(!$("an-sen").value)$("an-sen").value=s;}}});
+    nb.querySelectorAll(".sw").forEach(b=>b.onclick=()=>{b.setAttribute("aria-pressed",b.getAttribute("aria-pressed")!=="true");b.querySelector("small").textContent=b.getAttribute("aria-pressed")==="true"?"liberado":"sem acesso";});
+    $("an-x").onclick=()=>{ADM.novo=false;renderAdmin();};
+    $("an-ok").onclick=()=>{const perms={};nb.querySelectorAll(".sw").forEach(b=>perms[b.dataset.p]=b.getAttribute("aria-pressed")==="true");
+      salvarUsuario({original:"",matricula:$("an-mat").value,senha:$("an-sen").value,perms},$("an-ok"));};}
+  box.querySelectorAll(".au[data-i]").forEach(card=>{const u=ADM.lista[+card.dataset.i];const bt=card.querySelector('[data-f="salvar"]');
+    const marcar=()=>{card.classList.add("dirty");bt.disabled=false;};
+    card.querySelectorAll("input").forEach(i=>i.addEventListener("input",marcar));
+    card.querySelector('[data-f="ver"]').onclick=e=>{const i=card.querySelector('[data-f="sen"]');const v=i.type==="password";i.type=v?"text":"password";e.target.textContent=v?"ocultar":"ver";e.target.style.fontSize=v?".62rem":"";};
+    card.querySelectorAll(".sw").forEach(b=>b.onclick=()=>{const on=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",on);b.querySelector("small").textContent=on?"liberado":(u.perms[b.dataset.p]?"bloqueado":"sem acesso");marcar();});
+    card.querySelector('[data-f="tudo"]').onclick=()=>{const algum=[...card.querySelectorAll(".sw")].some(b=>b.getAttribute("aria-pressed")==="true");
+      if(algum){card.querySelectorAll(".sw").forEach(b=>{b.setAttribute("aria-pressed","false");b.querySelector("small").textContent=u.perms[b.dataset.p]?"bloqueado":"sem acesso";});}
+      else{Object.keys(u.perms).forEach(p=>{const b=card.querySelector('.sw[data-p="'+p+'"]');if(b){b.setAttribute("aria-pressed","true");b.querySelector("small").textContent="liberado";}});}
+      marcar();};
+    bt.onclick=()=>{const perms={};card.querySelectorAll(".sw").forEach(b=>perms[b.dataset.p]=b.getAttribute("aria-pressed")==="true");
+      salvarUsuario({original:u.matricula,matricula:card.querySelector('[data-f="mat"]').value,senha:card.querySelector('[data-f="sen"]').value,perms},bt);};});
+}
+async function salvarUsuario(d,bt){d.matricula=String(d.matricula||"").replace(/\D/g,"");d.senha=String(d.senha||"").trim();
+  if(!d.matricula){toast("Informe a matrícula.");return;}if(d.senha.length<4){toast("A senha precisa ter ao menos 4 caracteres.");return;}
+  if(!d.original&&!Object.values(d.perms).some(Boolean)){toast("Libere ao menos um acesso.");return;}
+  if(d.original&&d.original!==d.matricula&&!confirm("Trocar o login "+d.original+" por "+d.matricula+"? O usuário vai precisar entrar de novo."))return;
+  if(!navigator.onLine){toast("Sem internet: não dá para salvar agora.");return;}
+  const old=bt.textContent;bt.disabled=true;bt.textContent="Salvando…";
+  try{await admPost(Object.assign({acao:"admin_salvar"},d));toast(d.original?"Acesso atualizado na planilha.":"Usuário criado na planilha.");ADM.novo=false;
+    if(d.original===LOGIN.mat)setTimeout(revalidar,300);await carregarAdmin();}
+  catch(e){toast(e.message);bt.disabled=false;bt.textContent=old;}}
 
 // auditoria de retorno
 const RT={prod:null,venc:false,nc:false,fr:"",fe:""};
