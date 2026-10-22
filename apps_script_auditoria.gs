@@ -1,8 +1,9 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 8)
+ * Auditoria STA – Santa Therezinha (versão 9)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
+ *   - Auditoria_Cargas   (permissão aud_car) – estrutura pronta; rode prepararAbaCargas uma vez
  * Login pela aba Permissionamento (Matrícula, Permissão, Observação, Senha, Status).
  * Quem tem a permissão aud_adm administra os acessos pelo aplicativo.
  * Fotos vão para a pasta "Fotos Auditoria de Ruas" no Google Drive.
@@ -37,8 +38,17 @@ const ABAS = {
       'Vl_Ult_Entrada', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia'],
     texto: ['ID_Auditoria', 'Matricula_Auditor', 'Produto', 'Matricula_Colaborador_NC', 'ID_Sessao',
       'DataHora', 'Data_Vencimento']
+  },
+  cargas: {
+    nome: 'Auditoria_Cargas', perm: 'aud_car',
+    colunas: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente',
+      'Nome_Conferente', 'Box', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade',
+      'Motivo', 'Links_Fotos', 'ID_Sessao', 'Recebido_Em'],
+    texto: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Matricula_Conferente', 'Box', 'Numero_OS',
+      'Codigo_Produto', 'ID_Sessao']
   }
 };
+const MOTIVOS_CARGA = ['Falta', 'Avaria', 'Abastecimento', 'Sobras'];
 
 /* ===================== Entradas ===================== */
 
@@ -99,7 +109,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 8, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 9, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -281,6 +291,10 @@ function gravar(ss, cfg, registros) {
         const fe = salvarFoto(r.foto_etiqueta, r.ID_Auditoria + '_etiqueta');
         r.Foto_Retorno = fr; r.Foto_Etiqueta = fe;
         r.Links_Fotos = [fr, fe].filter(String).join(' ');
+      } else if (cfg === ABAS.cargas) {
+        r.Links_Fotos = r.Motivo === 'Sobras'
+          ? (r.fotos || []).map(function (d, i) { return salvarFoto(d, r.ID_Auditoria + '_sobra_' + (i + 1)); }).filter(String).join(' ')
+          : '';
       } else {
         r.Links_Fotos = (r.fotos || []).map(function (d, i) { return salvarFoto(d, r.ID_Auditoria + '_' + (i + 1)); }).filter(String).join(' ');
       }
@@ -380,6 +394,35 @@ function lerQuadro(ss) {
   if (sh.getLastRow() < 2) return [];
   return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getDisplayValues()
     .filter(function (l) { return String(l[0]).trim(); });
+}
+
+/* ===================== Auditoria de cargas ===================== */
+
+/** Rode UMA vez pelo editor: cria/ajusta os títulos da aba Auditoria_Cargas e a lista de motivos. */
+function prepararAbaCargas() {
+  const ss = abrirPlanilha(), cfg = ABAS.cargas;
+  const sh = ss.getSheetByName(cfg.nome) || ss.insertSheet(cfg.nome);
+  const ultCol = Math.max(sh.getLastColumn(), 1);
+  const atuais = sh.getLastRow() ? sh.getRange(1, 1, 1, ultCol).getDisplayValues()[0].map(String) : [];
+  const temDados = sh.getLastRow() > 1;
+  if (!temDados) {
+    sh.getRange(1, 1, 1, cfg.colunas.length).setValues([cfg.colunas]);
+    if (ultCol > cfg.colunas.length) sh.getRange(1, cfg.colunas.length + 1, 1, ultCol - cfg.colunas.length).clearContent();
+  } else {
+    cfg.colunas.forEach(function (c) { if (atuais.indexOf(c) < 0) { atuais.push(c); sh.getRange(1, atuais.length).setValue(c); } });
+  }
+  const cab = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0];
+  sh.getRange(1, 1, 1, cab.length).setFontWeight('bold').setBackground('#0A4DA2').setFontColor('#FFFFFF');
+  sh.setFrozenRows(1);
+  cfg.texto.forEach(function (c) { const i = cab.indexOf(c); if (i >= 0) sh.getRange(2, i + 1, sh.getMaxRows() - 1, 1).setNumberFormat('@'); });
+  const iMot = cab.indexOf('Motivo');
+  if (iMot >= 0) {
+    const regra = SpreadsheetApp.newDataValidation().requireValueInList(MOTIVOS_CARGA, true).setAllowInvalid(false)
+      .setHelpText('Escolha: Falta, Avaria, Abastecimento ou Sobras').build();
+    sh.getRange(2, iMot + 1, sh.getMaxRows() - 1, 1).setDataValidation(regra);
+  }
+  sh.autoResizeColumns(1, cab.length);
+  Logger.log('Aba Auditoria_Cargas pronta: ' + cab.join(' | '));
 }
 
 /* ===================== Testes pelo editor ===================== */
