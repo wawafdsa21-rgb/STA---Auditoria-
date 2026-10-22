@@ -162,7 +162,7 @@ $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("she
 paintWho(); if(DEMO&&!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Confira o retorno do repositor, com foto do produto e da etiqueta."],cargas:["Auditoria de cargas","Em preparação."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Inicie a rua e lance todos os retornos antes de finalizar."],cargas:["Auditoria de cargas","Em preparação."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
 function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();["ruas","retorno","cargas","admin","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="admin")carregarAdmin();if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
@@ -322,17 +322,21 @@ function renderRecords(){if(typeof renderSess==="function")try{renderSess();}cat
   const list=filtered(),L=$("list");
   if(!list.length){L.innerHTML='<div class="empty">Nenhum registro com estes filtros.<br>Ajuste o período ou o tipo.</div>';return;}
   L.innerHTML=list.slice(0,200).map(r=>r._aba==="retorno"?cardRet(r):card(r)).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
+  L.querySelectorAll(".rtrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openRetDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openSessDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".pbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r)openPrint(r);});
   L.querySelectorAll(".wbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r){openPrint(r);sendWA(r,$("pv-wa"));}});
 }
-function cardRet(r){const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";const tags=[];if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Possui_NC&&!r.Prox_Vencimento)tags.push("Retorno não conforme");
+function cardRet(r){const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";const tags=[];if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Retorno_NC||(r.Possui_NC&&!r.Prox_Vencimento&&!+r.Divergencia_Un))tags.push("Retorno não conforme");
   const fotos=[r.foto_retorno,r.foto_etiqueta].filter(Boolean);
   return '<details class="rec '+cls+'"><summary><div class="top"><span>'+esc(r.DataHora)+' · '+esc(r.Nome_Auditor)+'</span><span>'+esc(st)+'</span></div>'+
    '<div class="addr">Rua '+esc(r.Rua)+'</div><div class="desc">'+esc(r.Produto)+' – '+esc(r.Descricao_Produto)+'</div>'+
-   '<div class="tags"><span class="tag '+cls+'">'+esc(st)+'</span>'+tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</div></summary>'+
+   '<div class="tags"><span class="tag '+cls+'">'+esc(st)+'</span>'+tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+
+   (r.Qtd_Fisico!=null&&r.Qtd_Fisico!==""?'<span class="tag">Etiq. '+esc(r.Qtd_Etiqueta)+' · Fís. '+esc(r.Qtd_Fisico)+'</span><span class="tag">'+BRL.format(+r.Valor_Total||0)+'</span>':'')+
+   (+r.Divergencia_Un?'<span class="tag nc">Dif. '+(r.Divergencia_Un>0?'+':'')+esc(r.Divergencia_Un)+' un · '+BRL.format(+r.Valor_Divergencia||0)+'</span>':'')+'</div></summary>'+
    '<dl><dt>ID</dt><dd>'+esc(r.ID_Auditoria)+'</dd>'+(r.Possui_NC?'<dt>Responsável</dt><dd>'+esc(r.Nome_Colaborador_NC)+' ('+esc(r.Matricula_Colaborador_NC)+')</dd>':'')+(r.Observacao?'<dt>Obs.</dt><dd>'+esc(r.Observacao)+'</dd>':'')+'</dl>'+
-   (fotos.length?'<div class="pics">'+fotos.map((s,i)=>'<img src="'+s+'" alt="'+(i?'Etiqueta':'Retorno')+'">').join("")+'</div>':'')+'</details>';}
+   (fotos.length?'<div class="pics">'+fotos.map((s,i)=>'<img src="'+s+'" alt="'+(i?'Etiqueta':'Retorno')+'">').join("")+'</div>':'')+
+   (r.Sessao&&r.ID_Sessao?'<button type="button" class="btn full rtrel" data-s="'+esc(r.ID_Sessao)+'" style="margin-top:8px">Relatório do retorno – rua '+esc(r.Sessao.rua)+'</button>':'')+'</details>';}
 function card(r){
   const tags=[];if(r.Erro_Produto)tags.push("Lugar errado"+(r.Endereco_Correto?" (correto "+fmtAddr(r.Endereco_Correto)+")":""));if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Sem_Saldo)tags.push("Sem saldo");if(r.Avaria)tags.push("Avaria: "+r.Tipo_Avaria);
   const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";
@@ -346,7 +350,7 @@ const COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produt
 function cell(v){if(v===true)return "TRUE";if(v===false)return "FALSE";if(typeof v==="number")v=String(v).replace(".",",");v=v==null?"":String(v);return /[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].forEach(k=>o[k]=fmtAddr(o[k]));["Rua","Predio","Nivel","Apto"].forEach(k=>o[k]=unz(o[k]));
   if(typeof o.Vl_Ult_Entrada==="number")o.Vl_Ult_Entrada=Math.round(o.Vl_Ult_Entrada*100)/100;if(typeof o.Valor_Divergencia==="number")o.Valor_Divergencia=Math.round(o.Valor_Divergencia*100)/100;return o;}
-const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao"];
+const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Qtd_Etiqueta","Qtd_Fisico","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao","Vl_Ult_Entrada","Valor_Total","Divergencia_Un","Valor_Divergencia"];
 function csv(){const cols=$("f-aba").value==="retorno"?RET_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
 $("x-ruas").onclick=async()=>{
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
@@ -364,7 +368,7 @@ let SHEET_URL=store.get("audcd_sheet_url","");
 if(!SHEET_URL||SHEET_OLD.includes(SHEET_URL)){SHEET_URL=SHEET_DEFAULT;store.set("audcd_sheet_url","");}
 let syncing=false,syncAgain=false,lastSheetErr="",lastSheetOk=store.get("audcd_sheet_ok","");
 const SHEET_COLS=COLS.concat(["ID_Sessao"]);
-function toSheet(r){if(r._aba==="retorno"){const x={_aba:"retorno"};RET_COLS.forEach(c=>x[c]=r[c]==null?"":r[c]);x.foto_retorno=r.foto_retorno||"";x.foto_etiqueta=r.foto_etiqueta||"";return x;}
+function toSheet(r){if(r._aba==="retorno"){const x={_aba:"retorno"};RET_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.foto_retorno=r.foto_retorno||"";x.foto_etiqueta=r.foto_etiqueta||"";return x;}
   const o=norm2(r),x={_aba:"ruas"};SHEET_COLS.forEach(c=>x[c]=o[c]==null?"":o[c]);x.fotos=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);return x;}
 function sheetPending(){let n=0;HIST.forEach(r=>{if(r._sheet!==SHEET_URL)n++;});return n;}
 function paintSync(){const n=sheetPending(),l=$("sync-line");l.hidden=false;
@@ -668,50 +672,123 @@ async function salvarUsuario(d,bt){d.matricula=String(d.matricula||"").replace(/
     if(d.original===LOGIN.mat)setTimeout(revalidar,300);await carregarAdmin();}
   catch(e){toast(e.message);bt.disabled=false;bt.textContent=old;}}
 
-// auditoria de retorno
+// auditoria de retorno (por rua, vários lançamentos)
+let SR=store.get("audcd_sessao_ret",null);
 const RT={prod:null,venc:false,nc:false,fr:"",fe:""};
-const tProd=picker($("t-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{RT.prod=k;if(k!=null){const pk=eByProd.get(P.cod[k]);if(pk!=null){$("t-rua").value=E.pt[pk][0];autoRepRT(true);}}paintRT();}});
+const tProd=picker($("t-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{RT.prod=k;paintRT();if(k!=null)setTimeout(()=>$("t-qe").focus(),50);}});
 const tRep=picker($("t-rep"),{ph:"Matrícula ou nome",search:searchColab,describe:descColab});
-function ruaRT(){return String(parseInt(String($("t-rua").value).replace(/\D/g,""),10)||"");}
-function autoRepRT(force){const reps=repsDaRua(ruaRT()).filter(m=>cIdx.has(m));if(reps.length&&(force||tRep.value==null))tRep.set(cIdx.get(reps[0]));
-  $("t-rep-h").textContent=reps.length?"Pelo quadro da rua "+ruaRT()+": "+reps.map(m=>curto(nomeC(m))).join(" e ")+".":(ruaRT()?"Rua sem repositor no quadro.":"");}
-$("t-rua").addEventListener("input",()=>autoRepRT(true));
-document.querySelectorAll(".tg[data-t]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.t;RT[k]=!RT[k];b.setAttribute("aria-pressed",RT[k]);if(RT.venc||RT.nc)autoRepRT(false);paintRT();}));
+const qv=id=>{const v=String($(id).value).trim();return v===""?null:Math.max(0,parseInt(v,10)||0);};
+const vlRT=()=>RT.prod==null?0:P.vl[RT.prod];
+function calcRT(){const qe=qv("t-qe"),qf=qv("t-qf"),vl=vlRT();const dif=(qe==null||qf==null)?null:qf-qe;
+  return {qe,qf,vl,dif,tot:qf==null?null:Math.round(qf*vl*100)/100,vdif:dif==null?null:Math.round(dif*vl*100)/100};}
+document.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",()=>{const i=$(b.dataset.q);i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.s);paintRT();}));
+["t-qe","t-qf"].forEach(id=>$(id).addEventListener("input",paintRT));
+document.querySelectorAll(".tg[data-t]").forEach(b=>b.addEventListener("click",()=>{const k=b.dataset.t;RT[k]=!RT[k];b.setAttribute("aria-pressed",RT[k]);paintRT();}));
 function fotoRT(campo,input){input.addEventListener("change",async e=>{const f=e.target.files[0];e.target.value="";if(!f)return;try{RT[campo]=await compress(f);paintRT();setErr(campo==="fr"?"t-fr-f":"t-fe-f","");}catch(x){toast("Não foi possível ler a foto.");}});}
 fotoRT("fr",$("t-fr-in"));fotoRT("fr",$("t-fr-g"));fotoRT("fe",$("t-fe-in"));fotoRT("fe",$("t-fe-g"));
 function fotoBox(campo){const s=RT[campo];const el=$(campo==="fr"?"t-fr":"t-fe");el.innerHTML=s?'<span class="ph-it"><img src="'+s+'" alt="Prévia"><button type="button" aria-label="Remover foto">×</button></span>':"";
   if(s)el.querySelector("button").onclick=()=>{RT[campo]="";paintRT();};
   $(campo==="fr"?"t-fr-cam":"t-fe-cam").hidden=!!s;$(campo==="fr"?"t-fr-gal":"t-fe-gal").hidden=!!s;}
-function paintRT(){if(!$("t-info"))return;const k=RT.prod;
-  if(k!=null){const pk=eByProd.get(P.cod[k]);$("t-info").innerHTML=pk!=null?rackHTML(pk,"Endereço de picking do item",null,'<div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span>'+(E.qt[pk]?'<span>'+E.qt[pk]+' un/cx</span>':'')+'</div>'):'<div class="rack empty">Item sem endereço na base 8022. Informe a rua.</div>';}
-  else $("t-info").innerHTML="";
-  const nc=RT.venc||RT.nc;$("t-sub-venc").hidden=!RT.venc;$("t-nc").hidden=!nc;
-  const v=$("t-verdict");v.className="verdict "+(nc?"nc":"ok");v.textContent=nc?"Não conformidade – status Aberta":"Retorno conforme";
-  $("t-fr-f").querySelector(".lbl").innerHTML="Foto do retorno"+(RT.nc?" <small>(obrigatória)</small>":" <small>(opcional)</small>");
-  fotoBox("fr");fotoBox("fe");listaRT();}
-function listaRT(){const t0=new Date();t0.setHours(0,0,0,0);const L=allRecs().filter(r=>r._aba==="retorno"&&r.ts>=t0.getTime()&&r.Matricula_Auditor===auditor);
-  $("t-list").innerHTML=L.length?'<div class="block"><h3>Retornos de hoje <small>'+L.length+'</small></h3>'+L.map(r=>'<div class="rt-item"><div><b>'+esc(r.Produto)+'</b> – '+esc(r.Descricao_Produto)+'<div class="tags">'+(r.Possui_NC?'<span class="tag nc">'+(r.Prox_Vencimento?'Vence '+esc(r.Data_Vencimento):'Não conforme')+'</span>':'<span class="tag ok">Conforme</span>')+'<span class="tag">Rua '+esc(r.Rua)+'</span></div></div><div class="sm" style="white-space:nowrap;color:var(--muted)">'+esc(String(r.DataHora).slice(11,16))+'</div></div>').join("")+'</div>':"";}
-function resetRT(){tProd.clear();tRep.clear();RT.prod=null;RT.venc=false;RT.nc=false;RT.fr="";RT.fe="";$("t-rua").value="";$("t-venc").value="";$("t-obs").value="";$("t-rep-h").textContent="";
-  document.querySelectorAll(".tg[data-t]").forEach(b=>b.setAttribute("aria-pressed","false"));document.querySelectorAll("#v-retorno .field.bad").forEach(f=>setErr(f.id,""));paintRT();}
+function ncRT(){const c=calcRT();return RT.venc||RT.nc||(c.dif!=null&&c.dif!==0);}
+function setRepSess(){if(SR&&cIdx.has(SR.rep))tRep.set(cIdx.get(SR.rep));}
+function retRecs(){return SR?allRecs().filter(r=>r._aba==="retorno"&&r.ID_Sessao===SR.id):[];}
+function renderRS(){const box=$("rs-box");if(!box)return;
+  if(!SR){$("rt-form").hidden=true;$("t-list").innerHTML="";if(box.dataset.mode==="start")return;box.dataset.mode="start";
+    box.innerHTML='<h3>Retorno da rua</h3><p class="note" style="margin-top:0">Informe a rua uma vez e lance todos os itens do retorno. No fim, finalize para gerar o PDF.</p>'+
+      '<div class="field" id="rs-rua-f"><label for="rs-rua">Rua</label><input class="in" id="rs-rua" type="text" inputmode="numeric" placeholder="Ex.: 44"></div>'+
+      '<div class="field" id="rs-rep-f"><label>Repositor da rua</label><div id="rs-rep"></div><div class="hint" id="rs-rep-h">Preenchido pelo quadro de repositores ao digitar a rua.</div></div>'+
+      '<button type="button" class="save" id="rs-go" style="margin-top:14px">Iniciar retorno da rua</button>';
+    const sp=picker($("rs-rep"),{ph:"Matrícula do repositor (ou nome)",search:searchColab,describe:descColab});
+    $("rs-rua").addEventListener("input",()=>{const rua=String(parseInt($("rs-rua").value.replace(/\D/g,""),10)||"");const reps=repsDaRua(rua).filter(m=>cIdx.has(m));
+      if(reps.length){sp.set(cIdx.get(reps[0]));$("rs-rep-h").textContent="Pelo quadro: "+reps.map(m=>curto(nomeC(m))).join(" e ")+(reps.length>1?". Se for o outro, toque em Trocar.":".");}
+      else $("rs-rep-h").textContent=rua?"Rua sem repositor no quadro. Escolha o repositor.":"Preenchido pelo quadro de repositores ao digitar a rua.";});
+    $("rs-go").onclick=()=>{if(!auditor){toast("Faça login primeiro.");return;}
+      const rua=String(parseInt($("rs-rua").value.replace(/\D/g,""),10)||"");let bad=false;
+      if(!rua){setErr("rs-rua-f","Informe a rua.");bad=true;}else setErr("rs-rua-f","");
+      if(sp.value==null){setErr("rs-rep-f","Informe o repositor da rua.");bad=true;}else setErr("rs-rep-f","");
+      if(bad)return;const ci=sp.value;
+      SR={id:newId("RET"+rua),rua,rep:C.mat[ci],repNome:C.nome[ci],repFun:C.fun[ci],aud:auditor,audNome:nomeAud(),ini:Date.now()};
+      store.set("audcd_sessao_ret",SR);resetRT();renderRS();toast("Retorno da rua "+rua+" iniciado.");tProd.focus();};
+    return;}
+  box.dataset.mode="on";$("rt-form").hidden=false;
+  const recs=retRecs(),ncs=recs.filter(r=>r.Possui_NC),tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0),vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
+  box.innerHTML='<div class="sess-top"><div><h3>Retorno · Rua '+esc(SR.rua)+'</h3><div class="note" style="margin:4px 0 0">Repositor: <b>'+esc(SR.repNome)+'</b> · '+esc(SR.rep)+'</div></div><button type="button" class="link" id="rs-chg">Trocar repositor</button></div>'+
+    '<div class="sess-stats" style="margin-top:10px"><span><b>'+recs.length+'</b> ite'+(recs.length===1?'m':'ns')+'</span><span><b>'+ncs.length+'</b> NC</span><span><b>'+BRL.format(tot)+'</b> no retorno</span><span><b class="'+(vdiv<0?'q1-t':vdiv>0?'q3-t':'')+'">'+BRL.format(vdiv)+'</b> em divergência</span></div>'+
+    '<div id="rs-chg-box"></div><div class="row-btns"><button type="button" class="btn" id="rs-rel">Ver relatório</button><button type="button" class="btn" id="rs-end">Finalizar rua</button></div>';
+  $("rs-rel").onclick=()=>{if(!recs.length){toast("Nenhum item lançado ainda.");return;}openRetDoc(SR,recs);};
+  $("rs-end").onclick=()=>{if(!recs.length){if(confirm("Nenhum item lançado. Encerrar mesmo assim?")){SR=null;store.set("audcd_sessao_ret",null);resetRT();renderRS();}return;}
+    const s0=SR;openRetDoc(s0,recs,()=>{SR=null;store.set("audcd_sessao_ret",null);resetRT();renderRS();toast("Retorno da rua "+s0.rua+" finalizado.");});};
+  $("rs-chg").onclick=()=>{$("rs-chg-box").innerHTML='<div class="field"><label>Novo repositor</label><div id="rs-rep2"></div></div>';
+    picker($("rs-rep2"),{ph:"Matrícula do repositor (ou nome)",search:searchColab,describe:descColab,onPick:k=>{if(k==null)return;SR.rep=C.mat[k];SR.repNome=C.nome[k];SR.repFun=C.fun[k];store.set("audcd_sessao_ret",SR);setRepSess();renderRS();toast("Repositor alterado para os próximos itens.");}}).focus();};
+  $("t-list").innerHTML=recs.length?'<div class="block"><h3>Itens da rua '+esc(SR.rua)+' <small>'+recs.length+'</small></h3>'+recs.map(r=>{const d=+r.Divergencia_Un||0;
+      return '<div class="li"><div><div class="d"><b>'+esc(r.Produto)+'</b> – '+esc(r.Descricao_Produto)+'</div><div class="tags">'+
+        (r.Possui_NC?'<span class="tag nc">'+(d?'Dif. '+(d>0?'+':'')+d+' un':r.Prox_Vencimento?'Vence '+esc(r.Data_Vencimento):'Não conforme')+'</span>':'<span class="tag ok">Conforme</span>')+'</div></div>'+
+        '<div><div class="v">Etiq. '+esc(r.Qtd_Etiqueta)+' · Fís. '+esc(r.Qtd_Fisico)+'<br>'+BRL.format(+r.Valor_Total||0)+'</div><div class="act"><button type="button" class="btn sm" data-rx="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>';}).join("")+'</div>':"";
+  $("t-list").querySelectorAll("[data-rx]").forEach(b=>b.onclick=()=>delRec(b.dataset.rx).then(()=>renderRS()));}
+function paintRT(){if(!$("t-info"))return;renderRS();const k=RT.prod;
+  if(k!=null){const pk=eByProd.get(P.cod[k]);const outra=pk!=null&&SR&&E.pt[pk][0]!==SR.rua;
+    $("t-info").innerHTML=(pk!=null?rackHTML(pk,"Endereço de picking do item",null,'<div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span><span>R$ '+VL4.format(P.vl[k])+'/un</span>'+(E.qt[pk]?'<span>'+E.qt[pk]+' un/cx</span>':'')+'</div>'):'<div class="rack empty">Item sem endereço na base 8022.</div>')+
+      (outra?'<p class="note" style="color:var(--alert)">Atenção: o picking deste item fica na rua '+E.pt[pk][0]+', não na rua '+esc(SR.rua)+'.</p>':'');
+    $("t-cx-h").textContent=pk!=null&&E.qt[pk]?"1 caixa = "+E.qt[pk]+" un":"";}
+  else{$("t-info").innerHTML="";$("t-cx-h").textContent="";}
+  const c=calcRT(),nc=ncRT();
+  $("t-calc").innerHTML='<div><span>Valor unitário (286)</span><b>'+BRL.format(c.vl)+'</b></div><div><span>Valor total (físico)</span><b>'+(c.tot==null?'–':BRL.format(c.tot))+'</b></div>'+
+    '<div class="'+(c.dif==null?'':c.dif<0?'neg':c.dif>0?'pos':'zero')+'"><span>Diferença (físico − etiqueta)</span><b>'+(c.dif==null?'–':(c.dif>0?'+':'')+c.dif+' un')+'</b></div>'+
+    '<div class="'+(c.vdif==null?'':c.vdif<0?'neg':c.vdif>0?'pos':'zero')+'"><span>Valor da divergência</span><b>'+(c.vdif==null?'–':BRL.format(c.vdif))+'</b></div>';
+  $("t-sub-venc").hidden=!RT.venc;$("t-nc").hidden=!nc;
+  if(nc&&tRep.value==null)setRepSess();
+  const v=$("t-verdict");v.className="verdict "+(nc?"nc":"ok");v.textContent=nc?"Não conformidade – status Aberta"+(c.dif?" (divergência de quantidade)":""):"Retorno conforme";
+  $("t-rep-h").textContent=SR?"Repositor da rua: "+curto(SR.repNome)+".":"";
+  $("t-fr-f").querySelector(".lbl").innerHTML="Foto do retorno"+(nc?" <small>(obrigatória)</small>":" <small>(opcional)</small>");
+  fotoBox("fr");fotoBox("fe");}
+function resetRT(){tProd.clear();tRep.clear();RT.prod=null;RT.venc=false;RT.nc=false;RT.fr="";RT.fe="";["t-qe","t-qf","t-venc","t-obs"].forEach(i=>$(i).value="");
+  document.querySelectorAll(".tg[data-t]").forEach(b=>b.setAttribute("aria-pressed","false"));document.querySelectorAll("#v-retorno .field.bad").forEach(f=>setErr(f.id,""));setRepSess();paintRT();}
 $("t-save").addEventListener("click",async()=>{
-  if(!auditor){toast("Faça login primeiro.");return;}
-  const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const nc=RT.venc||RT.nc,rua=ruaRT(),venc=$("t-venc").value,obs=$("t-obs").value.trim();
-  chk(RT.prod==null,"t-prod-f","Escolha o produto.");
-  chk(!rua,"t-rua-f","Informe a rua.");
+  if(!auditor){toast("Faça login primeiro.");return;}if(!SR){toast("Inicie a rua primeiro.");return;}
+  const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const c=calcRT(),nc=ncRT(),venc=$("t-venc").value,obs=$("t-obs").value.trim();
+  chk(RT.prod==null,"t-prod-f","Escolha o item.");
+  chk(c.qe==null,"t-qe-f","Informe a quantidade da etiqueta.");
+  chk(c.qf==null,"t-qf-f","Informe a quantidade física.");
   chk(RT.venc&&!venc,"t-venc-f","Informe a data de vencimento.");
   chk(nc&&tRep.value==null,"t-rep-f","Informe o colaborador responsável.");
-  chk(RT.nc&&!RT.fr,"t-fr-f","Tire a foto do retorno.");
+  chk(nc&&!RT.fr,"t-fr-f","Tire a foto do retorno.");
   chk(RT.nc&&!obs,"t-obs-f","Descreva o que está errado no retorno.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
-  const now=new Date(),ri=tRep.value,k=RT.prod,dia=String(now.getFullYear())+pad(now.getMonth()+1)+pad(now.getDate());
+  const now=new Date(),ri=tRep.value,k=RT.prod;
   const rec={_aba:"retorno",ID_Auditoria:newId("RT"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),
-    Produto:P.cod[k],Descricao_Produto:P.desc[k],Rua:rua,Prox_Vencimento:RT.venc,Data_Vencimento:RT.venc?fmtD(venc):"",
-    Foto_Retorno:RT.fr?"1 foto":"",Foto_Etiqueta:RT.fe?"1 foto":"",Observacao:obs,Possui_NC:nc,
+    Produto:P.cod[k],Descricao_Produto:P.desc[k],Rua:SR.rua,Prox_Vencimento:RT.venc,Data_Vencimento:RT.venc?fmtD(venc):"",
+    Foto_Retorno:RT.fr?"1 foto":"",Foto_Etiqueta:RT.fe?"1 foto":"",Qtd_Etiqueta:c.qe,Qtd_Fisico:c.qf,Observacao:obs,Possui_NC:nc,Retorno_NC:RT.nc,
     Matricula_Colaborador_NC:nc?C.mat[ri]:"",Nome_Colaborador_NC:nc?C.nome[ri]:"",Funcao_Colaborador_NC:nc?C.fun[ri]:"",
-    Status_NC:nc?"Aberta":"Conforme",Responsavel_Tratativa:"",ID_Sessao:"RET-"+dia+"-"+auditor,foto_retorno:RT.fr,foto_etiqueta:RT.fe};
+    Status_NC:nc?"Aberta":"Conforme",Responsavel_Tratativa:"",ID_Sessao:SR.id,Vl_Ult_Entrada:c.vl,Valor_Total:c.tot,Divergencia_Un:c.dif,Valor_Divergencia:c.vdif,
+    Sessao:{id:SR.id,rua:SR.rua,rep:SR.rep,repNome:SR.repNome,repFun:SR.repFun,aud:SR.aud,audNome:SR.audNome},foto_retorno:RT.fr,foto_etiqueta:RT.fe};
   $("t-save").disabled=true;const ok=await saveRec(rec);$("t-save").disabled=false;
-  resetRT();window.scrollTo(0,0);toast((ok||dbState==="off"?"Retorno salvo":"Salvo neste aparelho, envio pendente")+(nc?" – NC aberta.":" – conforme."));tProd.focus();
+  resetRT();window.scrollTo(0,0);toast((ok||dbState==="off"?"Item salvo":"Salvo neste aparelho, envio pendente")+(nc?" – NC aberta.":" – conforme."));tProd.focus();
 });
+
+// relatório do retorno (PDF)
+function retDocHTML(S,recs){const L=recs.slice().sort((a,b)=>a.ts-b.ts);const ncs=L.filter(r=>r.Possui_NC);
+  const sum=(k)=>L.reduce((a,r)=>a+(+r[k]||0),0);const tot=sum("Valor_Total"),vdiv=sum("Valor_Divergencia"),qe=sum("Qtd_Etiqueta"),qf=sum("Qtd_Fisico");
+  const first=L[0],last=L[L.length-1];
+  const row=(k,v)=>'<tr><td class="k">'+k+'</td><td>'+(v===""||v==null?"–":esc(v))+'</td></tr>';
+  const oc=r=>{const o=[];if(+r.Divergencia_Un)o.push("Divergência de "+(r.Divergencia_Un>0?"+":"")+r.Divergencia_Un+" un");if(r.Prox_Vencimento)o.push("Vence "+r.Data_Vencimento);if(r.Retorno_NC)o.push("Retorno não conforme");return o.join("; ")||"Conforme";};
+  const pics=[];L.forEach(r=>{if(r.foto_retorno)pics.push({s:r.foto_retorno,c:r.Produto+" · retorno"});if(r.foto_etiqueta)pics.push({s:r.foto_etiqueta,c:r.Produto+" · etiqueta"});});
+  return '<div class="pd"><div class="pd-h"><img src="'+LOGO_BLUE+'" alt="Santa Therezinha"><div class="r"><h1>Auditoria de retorno – Rua '+esc(S.rua)+'</h1><p>Nº '+esc(S.id)+'</p></div></div>'+
+   '<h2>Identificação</h2><table>'+row("Período",(first?first.DataHora:"")+(last&&last!==first?" a "+String(last.DataHora).slice(11):""))+row("Auditor",(S.audNome||"")+" – matrícula "+S.aud)+row("Repositor da rua",S.repNome+" – matrícula "+S.rep+(S.repFun?" ("+S.repFun+")":""))+'</table>'+
+   '<div class="sum"><div><b>'+L.length+'</b><span>itens no retorno</span></div><div><b>'+ncs.length+'</b><span>não conformidades</span></div><div><b>'+BRL.format(tot)+'</b><span>valor total (físico)</span></div><div><b>'+BRL.format(vdiv)+'</b><span>valor da divergência</span></div></div>'+
+   '<h2>Itens conferidos</h2><table class="lt"><thead><tr><th>Item</th><th>Etiq.</th><th>Fís.</th><th>Dif.</th><th>Vl. un.</th><th>Valor total</th><th>Vl. div.</th><th>Ocorrência</th></tr></thead><tbody>'+
+   L.map(r=>'<tr><td>'+esc(r.Produto+" – "+r.Descricao_Produto)+'</td><td class="n">'+esc(r.Qtd_Etiqueta)+'</td><td class="n">'+esc(r.Qtd_Fisico)+'</td><td class="n">'+(+r.Divergencia_Un>0?'+':'')+esc(r.Divergencia_Un)+'</td><td class="n">'+BRL.format(+r.Vl_Ult_Entrada||0)+'</td><td class="n">'+BRL.format(+r.Valor_Total||0)+'</td><td class="n">'+BRL.format(+r.Valor_Divergencia||0)+'</td><td>'+esc(oc(r))+(r.Observacao?'<br><small>'+esc(r.Observacao)+'</small>':'')+'</td></tr>').join("")+
+   '</tbody><tfoot><tr><td>Total</td><td class="n">'+qe+'</td><td class="n">'+qf+'</td><td class="n">'+(qf-qe>0?'+':'')+(qf-qe)+'</td><td></td><td class="n">'+BRL.format(tot)+'</td><td class="n">'+BRL.format(vdiv)+'</td><td></td></tr></tfoot></table>'+
+   '<p class="decl" style="margin-top:6px">Divergência = quantidade física − quantidade da etiqueta. Valores pelo Vl. ult. entrada da base 286. Diferença negativa indica falta no retorno; positiva, sobra.</p>'+
+   (pics.length?'<h2>Registro fotográfico</h2><div class="fg">'+pics.map(x=>'<figure><img src="'+x.s+'" alt="'+esc(x.c)+'"><figcaption>'+esc(x.c)+'</figcaption></figure>').join("")+'</div>':'')+
+   '<p class="decl">Declaro ciência das informações de quantidade, valor e ocorrências apuradas na auditoria do retorno da rua '+esc(S.rua)+'.</p>'+
+   '<div class="sg"><div><b>Repositor</b>'+esc(S.repNome)+'<small>Matrícula '+esc(S.rep)+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Auditor</b>'+esc(S.audNome||"")+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Encarregado do setor de reposição</b>Nome: ____________________<small>Matrícula: ______________</small><small>Data: ___/___/______</small></div></div></div>';}
+function retText(S,recs){const ncs=recs.filter(r=>r.Possui_NC);const tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0),vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
+  return ["*AUDITORIA DE RETORNO – Rua "+S.rua+"*","Nº "+S.id,"Auditor: "+(S.audNome||"")+" ("+S.aud+")","Repositor: "+S.repNome+" ("+S.rep+")",recs.length+" itens · "+ncs.length+" NC","Valor total (físico): "+BRL.format(tot),"*Valor da divergência: "+BRL.format(vdiv)+"*"].join("\n");}
+function openRetDoc(S,recs,onClose){const vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
+  openDoc({html:retDocHTML(S,recs),multi:true,name:"Retorno_Rua"+S.rua+"_"+S.id+".pdf",title:"Auditoria de retorno – Rua "+S.rua,
+    short:"Auditoria de retorno – Rua "+S.rua+" – "+recs.length+" itens – divergência "+BRL.format(vdiv),text:retText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
 
 // modo offline (site)
 if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){

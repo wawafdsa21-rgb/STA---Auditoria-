@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 7)
+ * Auditoria STA – Santa Therezinha (versão 8)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -31,9 +31,10 @@ const ABAS = {
   retorno: {
     nome: 'Auditoria_Retorno', perm: 'aud_ret',
     colunas: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto',
-      'Rua', 'Prox_Vencimento', 'Data_Vencimento', 'Foto_Retorno', 'Foto_Etiqueta', 'Observacao', 'Possui_NC',
-      'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Funcao_Colaborador_NC', 'Status_NC',
-      'Responsavel_Tratativa', 'ID_Sessao', 'Links_Fotos', 'Recebido_Em'],
+      'Rua', 'Prox_Vencimento', 'Data_Vencimento', 'Foto_Retorno', 'Foto_Etiqueta', 'Qtd_Etiqueta', 'Qtd_Fisico',
+      'Observacao', 'Possui_NC', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Funcao_Colaborador_NC', 'Status_NC',
+      'Responsavel_Tratativa', 'ID_Sessao', 'Links_Fotos', 'Recebido_Em',
+      'Vl_Ult_Entrada', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia'],
     texto: ['ID_Auditoria', 'Matricula_Auditor', 'Produto', 'Matricula_Colaborador_NC', 'ID_Sessao',
       'DataHora', 'Data_Vencimento']
   }
@@ -98,7 +99,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 7, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 8, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }

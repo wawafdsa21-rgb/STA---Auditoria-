@@ -283,3 +283,14 @@ nav button{font-size:.98rem!important;padding:0 2px}
 @media (prefers-reduced-motion: reduce){.sw i,.sw i::after{transition:none}}
 nav[data-n="6"] button{font-size:.86rem!important}
 nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}
+.row2q{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2q .field{margin-top:0}
+.row2q label{font-size:.85rem}
+.row2q .stepper button{width:42px}
+.rt-calc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.rt-calc div{background:var(--brand-soft);border-radius:8px;padding:10px}
+.rt-calc span{display:block;font-size:.78rem;color:var(--muted)}
+.rt-calc b{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;font-size:1.5rem;line-height:1.1;color:var(--brand-dark)}
+.rt-calc .neg b{color:var(--alert)}.rt-calc .pos b{color:#B88A00}.rt-calc .zero b{color:var(--ok)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rt-calc b{color:var(--ink)}}
+:root[data-theme="dark"] .rt-calc b{color:var(--ink)}

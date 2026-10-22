@@ -98,10 +98,20 @@
   </section>
 
   <section class="view" id="v-retorno" hidden>
+    <div class="block sess" id="rs-box"></div>
+    <div id="rt-form" hidden>
     <div class="block">
-      <div class="field" id="t-prod-f"><label>Produto do retorno</label><div id="t-prod"></div></div>
+      <div class="field" id="t-prod-f"><label>Item do retorno</label><div id="t-prod"></div></div>
       <div id="t-info"></div>
-      <div class="field" id="t-rua-f"><label for="t-rua">Rua</label><input class="in" id="t-rua" inputmode="numeric" placeholder="Ex.: 44"><div class="hint" id="t-rua-h">Preenchida pelo endereço de picking do item (8022). Pode alterar.</div></div>
+    </div>
+    <div class="block">
+      <h3>Quantidades <small>em unidades</small></h3>
+      <div class="row2q">
+        <div class="field" id="t-qe-f"><label for="t-qe">Qtd. na etiqueta</label><div class="stepper"><button type="button" data-q="t-qe" data-s="-1" aria-label="Diminuir">−</button><input class="in" id="t-qe" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-q="t-qe" data-s="1" aria-label="Aumentar">+</button></div></div>
+        <div class="field" id="t-qf-f"><label for="t-qf">Qtd. física (contada)</label><div class="stepper"><button type="button" data-q="t-qf" data-s="-1" aria-label="Diminuir">−</button><input class="in" id="t-qf" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-q="t-qf" data-s="1" aria-label="Aumentar">+</button></div></div>
+      </div>
+      <div class="hint" id="t-cx-h"></div>
+      <div class="rt-calc" id="t-calc"></div>
     </div>
     <div class="block">
       <h3>Conferência <small>toque para marcar</small></h3>
@@ -118,7 +128,8 @@
       <div class="field" id="t-fe-f"><span class="lbl">Foto da etiqueta</span><div class="ph1"><span id="t-fe"></span><label class="filebtn" id="t-fe-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="t-fe-in"></label><label class="filebtn" id="t-fe-gal">Galeria<input type="file" accept="image/*" id="t-fe-g"></label></div></div>
       <div class="field" id="t-obs-f"><label for="t-obs">Observação</label><textarea class="in" id="t-obs" placeholder="O que foi encontrado no retorno"></textarea></div>
     </div>
-    <button type="button" class="save" id="t-save">Salvar retorno</button>
+    <button type="button" class="save" id="t-save">Salvar e lançar próximo</button>
+    </div>
     <div id="t-list" style="margin-top:12px"></div>
   </section>
 
