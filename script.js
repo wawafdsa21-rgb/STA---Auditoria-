@@ -332,7 +332,7 @@ function cardCar(r){const cls=r.Motivo==="Sobras"?"tr":"nc";const fotos=r.fotos|
   return '<details class="rec '+cls+'"><summary><div class="top"><span>'+esc(r.DataHora)+' · '+esc(r.Nome_Auditor)+'</span><span>'+esc(r.Motivo)+'</span></div>'+
    '<div class="addr">Box '+esc(r.Box)+' · O.S. '+esc(r.Numero_OS)+'</div><div class="desc">'+esc(r.Codigo_Produto)+' – '+esc(r.Descricao_Produto)+'</div>'+
    '<div class="tags"><span class="tag '+(r.Motivo==="Sobras"?"":"nc")+'">'+esc(r.Motivo)+'</span><span class="tag">'+esc(r.Quantidade)+' un</span><span class="tag">'+BRL.format(+r.Valor_Total||0)+'</span></div></summary>'+
-   '<dl><dt>ID</dt><dd>'+esc(r.ID_Auditoria)+'</dd><dt>Conferente</dt><dd>'+esc(r.Nome_Conferente)+' ('+esc(r.Matricula_Conferente)+')</dd></dl>'+
+   '<dl><dt>ID</dt><dd>'+esc(r.ID_Auditoria)+'</dd><dt>Conferente</dt><dd>'+esc(r.Nome_Conferente)+' ('+esc(r.Matricula_Conferente)+')</dd>'+(r.Causador?'<dt>Causador</dt><dd>'+esc(r.Causador)+': '+esc(r.Nome_Causador)+' ('+esc(r.Matricula_Causador)+')</dd>':'')+'</dl>'+
    (fotos.length?'<div class="pics">'+fotos.map(s=>'<img src="'+s+'" alt="Foto da sobra">').join("")+'</div>':'')+
    (r.Sessao?'<button type="button" class="btn full cgrel" data-s="'+esc(r.ID_Sessao)+'" style="margin-top:8px">Relatório da carga – O.S. '+esc(r.Numero_OS)+'</button>':'')+'</details>';}
 function cardRet(r){const st=r.Status_NC,cls=st==="Conforme"||st==="Resolvida"?"ok":st==="Em Tratativa"?"tr":"nc";const tags=[];if(r.Prox_Vencimento)tags.push("Vence "+r.Data_Vencimento);if(r.Retorno_NC||(r.Possui_NC&&!r.Prox_Vencimento&&!+r.Divergencia_Un))tags.push("Retorno não conforme");
@@ -359,7 +359,7 @@ function cell(v){if(v===true)return "TRUE";if(v===false)return "FALSE";if(typeof
 function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].forEach(k=>o[k]=fmtAddr(o[k]));["Rua","Predio","Nivel","Apto"].forEach(k=>o[k]=unz(o[k]));
   if(typeof o.Vl_Ult_Entrada==="number")o.Vl_Ult_Entrada=Math.round(o.Vl_Ult_Entrada*100)/100;if(typeof o.Valor_Divergencia==="number")o.Valor_Divergencia=Math.round(o.Valor_Divergencia*100)/100;return o;}
 const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Qtd_Etiqueta","Qtd_Fisico","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao","Vl_Ult_Entrada","Valor_Total","Divergencia_Un","Valor_Divergencia"];
-const CAR_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Matricula_Conferente","Nome_Conferente","Box","Numero_OS","Codigo_Produto","Descricao_Produto","Quantidade","Motivo","Valor_Total","ID_Sessao"];
+const CAR_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Matricula_Conferente","Nome_Conferente","Box","Numero_OS","Codigo_Produto","Descricao_Produto","Quantidade","Motivo","Causador","Matricula_Causador","Nome_Causador","Valor_Total","ID_Sessao"];
 function csv(){const ab=$("f-aba").value,cols=ab==="retorno"?RET_COLS:ab==="cargas"?CAR_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
 $("x-ruas").onclick=async()=>{
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
@@ -802,12 +802,15 @@ function openRetDoc(S,recs,onClose){const vdiv=recs.reduce((a,r)=>a+(+r.Valor_Di
 
 // auditoria de cargas
 let SC=store.get("audcd_sessao_car",null);
-const CG={prod:null,mot:"",fotos:[]};
+const CG={prod:null,mot:"",fotos:[],cau:""};
 const gProd=picker($("g-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{CG.prod=k;paintCG();if(k!=null)setTimeout(()=>$("g-qtd").focus(),50);}});
 const gq=()=>{const v=String($("g-qtd").value).trim();return v===""?null:Math.max(0,parseInt(v,10)||0);};
 document.querySelectorAll("[data-gq]").forEach(b=>b.addEventListener("click",()=>{const i=$("g-qtd");i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.gq);paintCG();}));
 $("g-qtd").addEventListener("input",paintCG);
-document.querySelectorAll(".mot button").forEach(b=>b.addEventListener("click",()=>{CG.mot=b.dataset.m;setErr("g-mot-f","");paintCG();}));
+document.querySelectorAll(".mot button[data-m]").forEach(b=>b.addEventListener("click",()=>{CG.mot=b.dataset.m;setErr("g-mot-f","");paintCG();}));
+const gSep=picker($("g-sep"),{ph:"Matrícula ou nome do separador",search:searchColab,describe:descColab,onPick:k=>{if(k!=null&&SC){SC.ultSep=C.mat[k];store.set("audcd_sessao_car",SC);setErr("g-cau-f","");}}});
+document.querySelectorAll(".cau button").forEach(b=>b.addEventListener("click",()=>{CG.cau=b.dataset.c;setErr("g-cau-f","");
+  if(CG.cau==="Separador"&&gSep.value==null&&SC&&SC.ultSep&&cIdx.has(SC.ultSep))gSep.set(cIdx.get(SC.ultSep));paintCG();if(CG.cau==="Separador"&&gSep.value==null)setTimeout(()=>gSep.focus(),50);}));
 async function addFotoCG(e){const f=e.target.files[0];e.target.value="";if(!f||CG.fotos.length>=3)return;try{CG.fotos.push(await compress(f));setErr("g-foto-f","");paintCG();}catch(x){toast("Não foi possível ler a foto.");}}
 $("g-foto").addEventListener("change",addFotoCG);$("g-foto-g").addEventListener("change",addFotoCG);
 function carRecs(){return SC?allRecs().filter(r=>r._aba==="cargas"&&r.ID_Sessao===SC.id):[];}
@@ -839,31 +842,36 @@ function renderCS(){const box=$("cs-box");if(!box)return;
   $("cs-end").onclick=()=>{if(!recs.length){if(confirm("Nenhum item lançado. Encerrar mesmo assim?")){SC=null;store.set("audcd_sessao_car",null);resetCG();renderCS();}return;}
     const s0=SC;openCarDoc(s0,recs,()=>{SC=null;store.set("audcd_sessao_car",null);resetCG();renderCS();toast("Conferência da O.S. "+s0.os+" finalizada.");});};
   $("g-list").innerHTML=recs.length?'<div class="block"><h3>Itens da O.S. '+esc(SC.os)+' <small>'+recs.length+'</small></h3>'+recs.map(r=>
-      '<div class="li"><div><div class="d"><b>'+esc(r.Codigo_Produto)+'</b> – '+esc(r.Descricao_Produto)+'</div><div class="tags"><span class="tag '+(r.Motivo==="Sobras"?"":"nc")+'">'+esc(r.Motivo)+'</span>'+((r.fotos||[]).length?'<span class="tag">'+r.fotos.length+' foto'+(r.fotos.length>1?'s':'')+'</span>':'')+'</div></div>'+
+      '<div class="li"><div><div class="d"><b>'+esc(r.Codigo_Produto)+'</b> – '+esc(r.Descricao_Produto)+'</div><div class="tags"><span class="tag '+(r.Motivo==="Sobras"?"":"nc")+'">'+esc(r.Motivo)+'</span>'+(r.Causador?'<span class="tag">'+esc(r.Causador)+': '+esc(curto(r.Nome_Causador))+'</span>':'')+((r.fotos||[]).length?'<span class="tag">'+r.fotos.length+' foto'+(r.fotos.length>1?'s':'')+'</span>':'')+'</div></div>'+
       '<div><div class="v">'+esc(r.Quantidade)+' un<br>'+BRL.format(+r.Valor_Total||0)+'</div><div class="act"><button type="button" class="btn sm" data-gx="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>').join("")+'</div>':"";
   $("g-list").querySelectorAll("[data-gx]").forEach(b=>b.onclick=()=>delRec(b.dataset.gx).then(()=>renderCS()));}
 function paintCG(){if(!$("g-info"))return;renderCS();const k=CG.prod;
   if(k!=null){const pk=eByProd.get(P.cod[k]);$("g-info").innerHTML='<div class="rack" style="margin-top:10px"><div class="rack-body"><div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span><span>R$ '+VL4.format(P.vl[k])+'/un</span>'+(pk!=null?'<span>Picking '+esc(E.id[pk])+'</span>':'')+'</div></div></div>';
     $("g-cx-h").textContent=pk!=null&&E.qt[pk]?"1 caixa = "+E.qt[pk]+" un":"";}else{$("g-info").innerHTML="";$("g-cx-h").textContent="";}
   const q=gq()||0,vl=k!=null?P.vl[k]:0;$("g-valor").textContent=BRL.format(q*vl);$("g-calc").textContent=q+" un × "+BRL.format(vl);
-  document.querySelectorAll(".mot button").forEach(b=>b.setAttribute("aria-checked",b.dataset.m===CG.mot));
+  document.querySelectorAll(".mot button[data-m]").forEach(b=>b.setAttribute("aria-checked",b.dataset.m===CG.mot));
+  document.querySelectorAll(".cau button").forEach(b=>b.setAttribute("aria-checked",b.dataset.c===CG.cau));
+  $("g-sep-w").hidden=CG.cau!=="Separador";
+  $("g-cau-h").textContent=CG.cau==="Conferente"&&SC?"Ocorrência atribuída ao conferente "+curto(SC.confNome)+".":CG.cau==="Separador"?"Escolha quem separou o item.":"";
   $("g-foto-f").hidden=CG.mot!=="Sobras";
   const box=$("g-fotos");box.innerHTML=CG.fotos.map((s,i)=>'<div class="ph-it"><img src="'+s+'" alt="Foto '+(i+1)+'"><button type="button" data-i="'+i+'" aria-label="Remover foto">×</button></div>').join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>{CG.fotos.splice(+b.dataset.i,1);paintCG();});
   $("g-cam").hidden=$("g-gal").hidden=CG.fotos.length>=3;}
-function resetCG(){gProd.clear();CG.prod=null;CG.mot="";CG.fotos=[];$("g-qtd").value="";document.querySelectorAll("#v-cargas .field.bad").forEach(f=>setErr(f.id,""));paintCG();}
+function resetCG(){gProd.clear();CG.prod=null;CG.mot="";CG.fotos=[];CG.cau="";gSep.clear();$("g-qtd").value="";document.querySelectorAll("#v-cargas .field.bad").forEach(f=>setErr(f.id,""));paintCG();}
 $("g-save").addEventListener("click",async()=>{
   if(!auditor){toast("Faça login primeiro.");return;}if(!SC){toast("Inicie a conferência primeiro.");return;}
   const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const q=gq();
   chk(CG.prod==null,"g-prod-f","Escolha o item.");
   chk(!(q>0),"g-qtd-f","Informe a quantidade.");
   chk(!CG.mot,"g-mot-f","Escolha o motivo.");
+  chk(!CG.cau,"g-cau-f","Escolha o causador da ocorrência.");
+  chk(CG.cau==="Separador"&&gSep.value==null,"g-cau-f","Informe o separador.");
   chk(CG.mot==="Sobras"&&!CG.fotos.length,"g-foto-f","Tire ao menos uma foto da sobra.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
   const now=new Date(),k=CG.prod,vl=P.vl[k];
   const rec={_aba:"cargas",ID_Auditoria:newId("CG"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),
     Matricula_Conferente:SC.conf,Nome_Conferente:SC.confNome,Box:SC.box,Numero_OS:SC.os,Codigo_Produto:P.cod[k],Descricao_Produto:P.desc[k],
-    Quantidade:q,Motivo:CG.mot,Valor_Total:Math.round(q*vl*100)/100,Vl_Unit:vl,Possui_NC:true,ID_Sessao:SC.id,
+    Quantidade:q,Motivo:CG.mot,Causador:CG.cau,Matricula_Causador:CG.cau==="Separador"?C.mat[gSep.value]:SC.conf,Nome_Causador:CG.cau==="Separador"?C.nome[gSep.value]:SC.confNome,Valor_Total:Math.round(q*vl*100)/100,Vl_Unit:vl,Possui_NC:true,ID_Sessao:SC.id,
     Sessao:{id:SC.id,box:SC.box,os:SC.os,conf:SC.conf,confNome:SC.confNome,aud:SC.aud,audNome:SC.audNome},fotos:CG.mot==="Sobras"?CG.fotos.slice():[]};
   $("g-save").disabled=true;const ok=await saveRec(rec);$("g-save").disabled=false;
   resetCG();window.scrollTo(0,0);toast((ok||dbState==="off"?"Item salvo":"Salvo neste aparelho, envio pendente")+" – "+rec.Motivo+".");gProd.focus();
@@ -875,18 +883,22 @@ function carDocHTML(S,recs){const L=recs.slice().sort((a,b)=>a.ts-b.ts),m=porMot
    '<h2>Identificação</h2><table>'+row("Período",(first?first.DataHora:"")+(last&&last!==first?" a "+String(last.DataHora).slice(11):""))+row("Box",S.box)+row("Número da O.S.",S.os)+
    row("Conferente",S.confNome+" – matrícula "+S.conf)+row("Auditor",(S.audNome||"")+" – matrícula "+S.aud)+'</table>'+
    '<div class="sum">'+Object.entries(m).map(([k,x])=>'<div><b>'+x.n+'</b><span>'+k+' · '+x.q+' un · '+BRL.format(x.v)+'</span></div>').join("")+'</div>'+
-   '<h2>Itens com ocorrência</h2><table class="lt"><thead><tr><th>Item</th><th>Motivo</th><th>Qtd.</th><th>Vl. un.</th><th>Valor total</th></tr></thead><tbody>'+
-   L.map(r=>'<tr><td>'+esc(r.Codigo_Produto+" – "+r.Descricao_Produto)+'</td><td>'+esc(r.Motivo)+'</td><td class="n">'+esc(r.Quantidade)+'</td><td class="n">'+BRL.format(+r.Vl_Unit||((+r.Valor_Total||0)/(+r.Quantidade||1)))+'</td><td class="n">'+BRL.format(+r.Valor_Total||0)+'</td></tr>').join("")+
-   '</tbody><tfoot><tr><td colspan="2">Total</td><td class="n">'+L.reduce((a,r)=>a+(+r.Quantidade||0),0)+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
+   (function(){const cs={};L.forEach(r=>{const k=(r.Causador||"–")+"|"+(r.Nome_Causador||"");const x=cs[k]=cs[k]||{c:r.Causador||"–",n:r.Nome_Causador||"",m:r.Matricula_Causador||"",i:0,q:0,v:0};x.i++;x.q+=+r.Quantidade||0;x.v+=+r.Valor_Total||0;});
+     return '<h2>Por causador</h2><table class="lt"><thead><tr><th>Causador</th><th>Colaborador</th><th>Itens</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>'+Object.values(cs).sort((a,b)=>b.v-a.v).map(x=>'<tr><td>'+esc(x.c)+'</td><td>'+esc(x.n)+(x.m?' ('+esc(x.m)+')':'')+'</td><td class="n">'+x.i+'</td><td class="n">'+x.q+'</td><td class="n">'+BRL.format(x.v)+'</td></tr>').join("")+'</tbody></table>';})()+
+   '<h2>Itens com ocorrência</h2><table class="lt"><thead><tr><th>Item</th><th>Motivo</th><th>Causador</th><th>Qtd.</th><th>Vl. un.</th><th>Valor total</th></tr></thead><tbody>'+
+   L.map(r=>'<tr><td>'+esc(r.Codigo_Produto+" – "+r.Descricao_Produto)+'</td><td>'+esc(r.Motivo)+'</td><td>'+esc(r.Causador?r.Causador+": "+curto(r.Nome_Causador):"–")+'</td><td class="n">'+esc(r.Quantidade)+'</td><td class="n">'+BRL.format(+r.Vl_Unit||((+r.Valor_Total||0)/(+r.Quantidade||1)))+'</td><td class="n">'+BRL.format(+r.Valor_Total||0)+'</td></tr>').join("")+
+   '</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">'+L.reduce((a,r)=>a+(+r.Quantidade||0),0)+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
    '<p class="decl" style="margin-top:6px">Valores pelo Vl. ult. entrada da base 286.</p>'+
    (pics.length?'<h2>Fotos das sobras</h2><div class="fg">'+pics.map(x=>'<figure><img src="'+x.s+'" alt="Foto da sobra"><figcaption>'+esc(x.c)+'</figcaption></figure>').join("")+'</div>':'')+
    '<p class="decl">Declaro ciência das ocorrências registradas na auditoria da carga da O.S. '+esc(S.os)+'.</p>'+
    '<div class="sg"><div><b>Conferente</b>'+esc(S.confNome)+'<small>Matrícula '+esc(S.conf)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(S.audNome||"")+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
-   '<div><b>Encarregado / Líder</b>Nome: ____________________<small>Matrícula: ______________</small><small>Data: ___/___/______</small></div></div></div>';}
+   '<div><b>Encarregado / Líder</b>Nome: ____________________<small>Matrícula: ______________</small><small>Data: ___/___/______</small></div>'+
+   (function(){const s={};L.forEach(r=>{if(r.Causador==="Separador"&&r.Matricula_Causador)s[r.Matricula_Causador]=r.Nome_Causador;});return Object.entries(s).map(([m,n])=>'<div><b>Separador</b>'+esc(n)+'<small>Matrícula '+esc(m)+'</small><small>Data: ___/___/______</small></div>').join("");})()+'</div></div>';}
 function carText(S,recs){const m=porMotivo(recs),tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0);
   return ["*AUDITORIA DE CARGA – O.S. "+S.os+"*","Box "+S.box+" · Nº "+S.id,"Conferente: "+S.confNome+" ("+S.conf+")","Auditor: "+(S.audNome||"")+" ("+S.aud+")",
-    Object.entries(m).filter(([k,x])=>x.n).map(([k,x])=>k+": "+x.q+" un ("+BRL.format(x.v)+")").join("\n"),"*Valor total: "+BRL.format(tot)+"*"].filter(Boolean).join("\n");}
+    Object.entries(m).filter(([k,x])=>x.n).map(([k,x])=>k+": "+x.q+" un ("+BRL.format(x.v)+")").join("\n"),
+    (function(){const c={};recs.forEach(r=>{if(!r.Causador)return;const k=r.Causador+": "+curto(r.Nome_Causador);c[k]=(c[k]||0)+(+r.Valor_Total||0);});const L=Object.entries(c);return L.length?"Causadores:\n"+L.map(([k,v])=>k+" ("+BRL.format(v)+")").join("\n"):"";})(),"*Valor total: "+BRL.format(tot)+"*"].filter(Boolean).join("\n");}
 function openCarDoc(S,recs,onClose){const tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0);
   openDoc({html:carDocHTML(S,recs),multi:true,name:"Carga_OS"+S.os+"_"+S.id+".pdf",title:"Auditoria de carga – O.S. "+S.os,
     short:"Auditoria de carga – O.S. "+S.os+" – Box "+S.box+" – "+BRL.format(tot),text:carText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
@@ -1005,7 +1017,7 @@ const FIT_JS='function stFit(el){var c=el.cloneNode(true);c.style.cssText="posit
 (new Function(FIT_JS+';window.stFit=stFit;'))();
 function fitWhenReady(el,cb){const imgs=[...el.querySelectorAll("img")].filter(i=>!i.complete);let n=imgs.length;const go=()=>{window.stFit(el);cb&&cb();};if(!n){go();return;}imgs.forEach(i=>{i.onload=i.onerror=()=>{if(--n===0)go();};});}
 // relatório consolidado da rua
-const SCSS='.pd .fg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pd .fg figure{margin:0;page-break-inside:avoid;break-inside:avoid}.pd .fg img{display:block;width:100%;height:36mm;object-fit:cover;border:1px solid #C9D6EA}.pd .fg figcaption{font-size:9.5px;color:#4F6380;margin-top:2px;line-height:1.2}'+
+const SCSS='.pd .sg{row-gap:40px}.pd .fg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pd .fg figure{margin:0;page-break-inside:avoid;break-inside:avoid}.pd .fg img{display:block;width:100%;height:36mm;object-fit:cover;border:1px solid #C9D6EA}.pd .fg figcaption{font-size:9.5px;color:#4F6380;margin-top:2px;line-height:1.2}'+
  '.pd .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.pd .sum div{border:1px solid #C9D6EA;padding:6px;text-align:center}.pd .sum b{display:block;font-size:16px;color:#0A4DA2}.pd .sum span{font-size:10px;color:#4F6380}'+
  '.pd .lt th{background:#0A4DA2;color:#fff;font-size:10.5px;text-align:left;padding:4px 6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.pd .lt td{font-size:10.5px}.pd .lt tr{page-break-inside:avoid}.pd .lt td.n{text-align:right;white-space:nowrap}.pd .lt tfoot td{font-weight:bold;background:#F2F6FC}'+
  '.pd .leg li{border-left-width:3px}';

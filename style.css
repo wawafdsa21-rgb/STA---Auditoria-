@@ -297,6 +297,7 @@ nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}
 .mot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mot button{min-height:52px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface-2);font-weight:700;font-size:1rem;cursor:pointer;color:var(--ink)}
 .mot button[aria-checked="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+.cau button[aria-checked="true"]{background:var(--brand-dark)!important;border-color:var(--brand-dark)!important}
 .mot button[data-m="Sobras"][aria-checked="true"]{background:#B88A00;border-color:#B88A00}
 .mot button[data-m="Falta"][aria-checked="true"],.mot button[data-m="Avaria"][aria-checked="true"]{background:var(--alert);border-color:var(--alert)}
 .field.bad .mot button{border-color:var(--alert)}
