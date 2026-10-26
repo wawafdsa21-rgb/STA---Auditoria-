@@ -103,6 +103,7 @@
     <div class="block">
       <div class="field" id="t-prod-f"><label>Item do retorno</label><div id="t-prod"></div></div>
       <div id="t-info"></div>
+      <div class="field" id="t-os-f"><label for="t-os">Número da O.S. <small style="font-weight:400;color:var(--muted)">(opcional)</small></label><input class="in" id="t-os" inputmode="numeric" placeholder="Ex.: 13305193"><div class="hint" id="t-rot">Com a rotina 8457 importada, o repositor responsável é puxado pela O.S. ou pelo item + rua.</div></div>
     </div>
     <div class="block">
       <h3>Quantidades <small>em unidades</small></h3>
@@ -210,6 +211,22 @@
       <p class="hint">Colunas usadas: CODPROD, RUA, PREDIO, NIVEL, APTO e QTUNITCX.</p>
       <p class="okline" id="b8022-msg"></p>
     </div>
+    <div class="block">
+      <h3>Base de funcionários (Quadro)</h3>
+      <div class="bstat"><span id="bq-src">Base original</span><span><b id="bq-n">0</b> colaboradores</span></div>
+      <label class="filebtn" style="width:100%">Importar quadro de funcionários (.xls ou .xlsx)<input type="file" id="bq-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="hint">Arquivo Quadro_e_Itens, aba Quadro: colunas Matrícula, Colaborador e Função. Colaboradores cadastrados pelo app continuam valendo.</p>
+      <p class="okline" id="bq-msg"></p>
+    </div>
+
+    <div class="block">
+      <h3>Rotina de retorno (8457)</h3>
+      <div class="bstat"><span id="br-src">Nenhuma rotina carregada</span><span><b id="br-n">0</b> OS</span></div>
+      <label class="filebtn" style="width:100%">Importar relatório 8457 (.xls ou .xlsx)<input type="file" id="br-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="hint">Colunas usadas: DATA, NUMOS, CODPROD, QTD, RUA_O, CODFUNCOS e NOME. A rotina vai para a planilha (aba Rotina_Retorno) e chega a todos os celulares. No retorno, o repositor responsável é puxado pela OS ou pelo item + rua.</p>
+      <p class="okline" id="br-msg"></p>
+    </div>
+
     <button type="button" class="btn full" id="b-reset">Voltar às bases originais</button>
     <p class="note">As bases atualizadas ficam guardadas neste aparelho. Atualize em cada celular usado na auditoria.</p>
   </section>
@@ -232,6 +249,16 @@
     <p class="lede">Pesquise sua matrícula ou nome. Fica salvo neste aparelho.</p>
     <div id="sh-pick"></div>
     <p class="hint" style="margin-top:12px">Para trocar depois, toque no seu nome no topo.</p>
+  </div>
+</div>
+<div class="sheet" id="nc-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="nc-t">
+  <div class="panel">
+    <h2 id="nc-t">Novo colaborador</h2>
+    <p class="lede">Fica disponível em todas as auditorias e é enviado para a planilha.</p>
+    <div class="field" id="nc-mat-f"><label for="nc-mat">Matrícula</label><input class="in" id="nc-mat" inputmode="numeric" autocomplete="off"></div>
+    <div class="field" id="nc-nome-f"><label for="nc-nome">Nome completo</label><input class="in" id="nc-nome" autocomplete="off" style="text-transform:uppercase"></div>
+    <div class="field" id="nc-fun-f"><label for="nc-fun">Função</label><input class="in" id="nc-fun" list="nc-funcs" autocomplete="off" style="text-transform:uppercase" placeholder="Ex.: AUXILIAR DE DEPOSITO"><datalist id="nc-funcs"></datalist></div>
+    <div class="row-btns"><button type="button" class="btn" id="nc-x">Cancelar</button><button type="button" class="save" id="nc-ok" style="margin:0;min-height:48px;font-size:1.15rem">Cadastrar</button></div>
   </div>
 </div>
 <div class="sheet" id="menu" hidden role="dialog" aria-modal="true" aria-labelledby="mn-t">

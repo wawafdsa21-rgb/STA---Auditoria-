@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 11)
+ * Auditoria STA – Santa Therezinha (versão 12)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -35,9 +35,9 @@ const ABAS = {
       'Rua', 'Prox_Vencimento', 'Data_Vencimento', 'Foto_Retorno', 'Foto_Etiqueta', 'Qtd_Etiqueta', 'Qtd_Fisico',
       'Observacao', 'Possui_NC', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Funcao_Colaborador_NC', 'Status_NC',
       'Responsavel_Tratativa', 'ID_Sessao', 'Links_Fotos', 'Recebido_Em',
-      'Vl_Ult_Entrada', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia'],
+      'Vl_Ult_Entrada', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Numero_OS'],
     texto: ['ID_Auditoria', 'Matricula_Auditor', 'Produto', 'Matricula_Colaborador_NC', 'ID_Sessao',
-      'DataHora', 'Data_Vencimento']
+      'DataHora', 'Data_Vencimento', 'Numero_OS']
   },
   cargas: {
     nome: 'Auditoria_Cargas', perm: 'aud_car',
@@ -61,6 +61,12 @@ function doPost(e) {
 
   const sessao = validarToken(dados.token);
   if (!sessao.ok) return resposta({ ok: false, erro: sessao.erro, login: true });
+
+  if (dados.acao === 'colab_salvar') return resposta(salvarColaboradores(dados.lista, sessao));
+  if (dados.acao === 'rotina_salvar') {
+    if (sessao.permissoes.indexOf('aud_ret') < 0 && sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Importar a rotina exige aud_ret ou aud_adm.' });
+    return resposta(salvarRotina(dados.linhas, sessao));
+  }
 
   if (String(dados.acao || '').indexOf('admin_') === 0) {
     if (sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Sem permissão de administração (aud_adm).' });
@@ -104,6 +110,11 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     const ss = abrirPlanilha();
     if (p.acao === 'sessao') return resposta(validarToken(p.token));
+    if (p.acao === 'apoio') {
+      const s = validarToken(p.token);
+      if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
+      return resposta({ ok: true, colaboradores: lerTabelaSimples(ss, ABA_COLAB, 3), rotina: lerRotina(ss, 60) });
+    }
     if (p.acao === 'fechamento') {
       const s = validarToken(p.token);
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
@@ -113,7 +124,8 @@ function doGet(e) {
         ruas: lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
           'Sem_Saldo', 'Avaria', 'Possui_NC', 'Qtd_Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em']),
         retorno: lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
-          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em']),
+          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS']),
+        rotina: lerRotina(ss, 400),
         cargas: lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
           'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
         quadro: lerQuadro(ss)
@@ -124,7 +136,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 11, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 12, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -344,6 +356,68 @@ function obterPasta() {
 
 function resposta(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ===================== Colaboradores cadastrados pelo app ===================== */
+const ABA_COLAB = 'Colaboradores_Cadastro';
+const ABA_ROTINA = 'Rotina_Retorno';
+
+function abaComCabecalho(ss, nome, cab) {
+  let sh = ss.getSheetByName(nome);
+  if (!sh) { sh = ss.insertSheet(nome); sh.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight('bold'); sh.setFrozenRows(1); }
+  return sh;
+}
+
+function salvarColaboradores(lista, sessao) {
+  const ss = abrirPlanilha(), sh = abaComCabecalho(ss, ABA_COLAB, ['Matricula', 'Nome', 'Funcao', 'Cadastrado_Por', 'Cadastrado_Em']);
+  const ex = {};
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 1).getDisplayValues().forEach(function (l, i) { ex[String(l[0]).trim()] = i + 2; });
+  let n = 0;
+  (lista || []).forEach(function (a) {
+    const m = String(a[0] || '').replace(/\D/g, ''), nome = String(a[1] || '').trim().toUpperCase(), f = String(a[2] || '').trim().toUpperCase();
+    if (!m || !nome) return;
+    if (ex[m]) { sh.getRange(ex[m], 2, 1, 2).setValues([[nome, f]]); return; }
+    const lin = sh.getLastRow() + 1;
+    sh.getRange(lin, 1, 1, 5).setNumberFormat('@').setValues([[m, nome, f, sessao.matricula, Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')]]);
+    ex[m] = lin; n++;
+  });
+  return { ok: true, adicionados: n };
+}
+
+function lerTabelaSimples(ss, nome, ncol) {
+  const sh = ss.getSheetByName(nome);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, ncol).getDisplayValues().filter(function (l) { return String(l[0]).trim(); });
+}
+
+/* ===================== Rotina de retorno (relatório 8457) ===================== */
+function salvarRotina(linhas, sessao) {
+  const ss = abrirPlanilha(), cab = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Rua_Origem', 'Matricula_Funcionario', 'Nome_Funcionario', 'Importado_Em', 'Importado_Por'];
+  const sh = abaComCabecalho(ss, ABA_ROTINA, cab);
+  const ex = new Set(sh.getLastRow() > 1 ? sh.getRange(2, 2, sh.getLastRow() - 1, 2).getDisplayValues().map(function (l) { return l[0] + '|' + l[1]; }) : []);
+  const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'), novas = [];
+  (linhas || []).forEach(function (a) {
+    const k = String(a[1]) + '|' + String(a[2]);
+    if (!a[1] || ex.has(k)) return;
+    ex.add(k);
+    novas.push([String(a[0] || ''), String(a[1]), String(a[2]), String(a[3] || ''), Number(a[4]) || 0, String(a[5] || ''), String(a[6] || ''), String(a[7] || ''), agora, sessao.matricula]);
+  });
+  if (novas.length) {
+    const ini = sh.getLastRow() + 1;
+    sh.getRange(ini, 1, novas.length, 3).setNumberFormat('@');
+    sh.getRange(ini, 6, novas.length, 2).setNumberFormat('@');
+    sh.getRange(ini, 1, novas.length, cab.length).setValues(novas);
+  }
+  return { ok: true, adicionados: novas.length, total: (linhas || []).length };
+}
+
+/** Linhas da rotina dos últimos N dias: [data, os, cod, desc, qtd, rua, matricula, nome]. */
+function lerRotina(ss, dias) {
+  const sh = ss.getSheetByName(ABA_ROTINA);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const lim = new Date(); lim.setDate(lim.getDate() - dias);
+  const limIso = Utilities.formatDate(lim, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 8).getDisplayValues().filter(function (l) { return l[1] && (!l[0] || l[0] >= limIso); });
 }
 
 /* ===================== Painel e fechamento ===================== */
