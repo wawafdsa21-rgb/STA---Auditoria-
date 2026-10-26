@@ -319,15 +319,18 @@ function allRecs(){const ids=new Set(),out=[];queue.forEach(x=>{ids.add(x.rec.ID
 function filtered(){const ab=$("f-aba").value,pv=$("f-periodo").value,eu=$("f-quem").value==="eu",tp=$("f-tipo").value;let from=0,to=Infinity;
   if(pv==="d"){const de=$("f-de").value,ate=$("f-ate").value||de;if(de){from=dayStart(de);to=dayStart(ate)+864e5;}}
   else{const days=+pv;if(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));from=d.getTime();}}
-  return allRecs().filter(r=>(r._aba||"ruas")===ab&&r.ts>=from&&r.ts<to&&(!eu||r.Matricula_Auditor===auditor)&&(tp==="todos"||(tp==="nc"?r.Possui_NC:!r.Possui_NC)));}
+  return (regFonte()==="planilha"?sheetRecs():allRecs()).filter(r=>(ab==="todas"||(r._aba||"ruas")===ab)&&r.ts>=from&&r.ts<to&&(!eu||r.Matricula_Auditor===auditor)&&(tp==="todos"||(tp==="nc"?r.Possui_NC:!r.Possui_NC)));}
 function renderRecords(){if(typeof renderSess==="function")try{renderSess();}catch(e){}try{if(!$("v-painel").hidden)renderPainel();}catch(e){}try{paintSync();}catch(e){}
-  const all=allRecs(),t0=new Date();t0.setHours(0,0,0,0);
+  const pla=regFonte()==="planilha";if(pla&&!REG.rows&&!REG.busy&&!$("v-registros").hidden)setTimeout(carregarReg,0);
+  const sl=$("sync-line");if(pla&&sl){sl.hidden=false;sl.style.color="";sl.innerHTML=esc(REG.info||"Planilha Google")+' <button type="button" class="link" id="reg-upd" style="padding:0 4px">Atualizar</button>';$("reg-upd").onclick=()=>carregarReg(true);}
+  const all=pla?sheetRecs():allRecs(),t0=new Date();t0.setHours(0,0,0,0);
   const ab=all.filter(r=>r.Possui_NC&&r.Status_NC!=="Resolvida");
   $("s-hoje").textContent=all.filter(r=>r.ts>=t0.getTime()).length;$("s-nc").textContent=ab.length;
   $("s-valor").textContent=BRL.format(ab.reduce((s,r)=>s+(+r.Valor_Divergencia||0),0)).replace(",00","");
   const list=filtered(),L=$("list");
   if(!list.length){L.innerHTML='<div class="empty">Nenhum registro com estes filtros.<br>Ajuste o período ou o tipo.</div>';return;}
-  L.innerHTML=list.slice(0,200).map(r=>r._aba==="retorno"?cardRet(r):r._aba==="cargas"?cardCar(r):card(r)).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
+  const adm=temPerm("aud_adm");L.innerHTML=list.slice(0,200).map(r=>{let h=r._aba==="retorno"?cardRet(r):r._aba==="cargas"?cardCar(r):card(r);if(adm)h=h.replace(/<\/details>$/,'<button type="button" class="btn full rdel" data-id="'+esc(r.ID_Auditoria)+'" data-aba="'+esc(r._aba||"ruas")+'" style="margin-top:8px;color:var(--alert);border-color:var(--alert)">Excluir registro</button></details>');return h;}).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
+  L.querySelectorAll(".rdel").forEach(b=>b.onclick=()=>excluirRegistro(b.dataset.id,b.dataset.aba));
   L.querySelectorAll(".cgrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openCarDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".rtrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openRetDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openSessDoc(recs[0].Sessao,recs);});
@@ -367,8 +370,8 @@ function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].fo
 const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Qtd_Etiqueta","Qtd_Fisico","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao","Vl_Ult_Entrada","Valor_Total","Divergencia_Un","Valor_Divergencia","Numero_OS"];
 const CAR_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Matricula_Conferente","Nome_Conferente","Box","Numero_OS","Codigo_Produto","Descricao_Produto","Quantidade","Motivo","Causador","Matricula_Causador","Nome_Causador","Valor_Total","ID_Sessao"];
 function csv(){const ab=$("f-aba").value,cols=ab==="retorno"?RET_COLS:ab==="cargas"?CAR_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
-$("x-nc").onclick=imprimirNCsPlanilha;
 $("x-ruas").onclick=async()=>{
+  if($("f-aba").value==="todas"){toast("Escolha um tipo de auditoria para baixar o CSV.");return;}
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
   const name=({retorno:"Auditoria_Retorno_",cargas:"Auditoria_Cargas_"}[$("f-aba").value]||"Auditoria_Ruas_")+todayISO()+".csv",data=csv();
   if(downloads){try{await downloads.save({filename:name,data:new Blob([data],{type:"text/csv"})});return;}catch(e){if(e&&e.code==="declined")return;if(e&&e.code==="rate_limited"){toast("Aguarde um instante e tente de novo.");return;}}}
@@ -507,22 +510,25 @@ function repsDaRua(rua){rua=String(rua);return QUADRO.filter(q=>q.ruas.includes(
 const nomeC=m=>{if(cIdx.has(m))return C.nome[cIdx.get(m)];const q=QUADRO.find(x=>x.mat===m);return q&&q.nome?q.nome:m;};
 const curto=n=>{const p=String(n).trim().split(/\s+/);return p.length>1?p[0]+" "+p[p.length-1]:String(n);};
 let RUA_TOT=null;
-function ruaTotMap(){if(RUA_TOT&&RUA_TOT._n===E.id.length)return RUA_TOT;const m={};E.pt.forEach((a,i)=>{if(E.cod[i]||true)m[a[0]]=(m[a[0]]||0)+1;});Object.defineProperty(m,"_n",{value:E.id.length,enumerable:false});RUA_TOT=m;return m;}
+function ruaTotMap(){if(RUA_TOT&&RUA_TOT._n===E.id.length)return RUA_TOT;const m={};E.pt.forEach((a,i)=>{if(!RUAS_FORA.has(a[0]))m[a[0]]=(m[a[0]]||0)+1;});Object.defineProperty(m,"_n",{value:E.id.length,enumerable:false});RUA_TOT=m;return m;}
 const pbool=v=>v===true||/^(TRUE|VERDADEIRO|SIM|1)$/i.test(String(v==null?"":v).trim());
 const pnum=v=>{if(typeof v==="number")return v;const s=String(v==null?"":v).replace(/[^\d,.-]/g,"");if(!s)return 0;return s.includes(",")?parseFloat(s.replace(/\./g,"").replace(",","."))||0:parseFloat(s)||0;};
 function pts(v,fb){if(typeof v==="number")return v;const s=String(v||"");let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(m)return new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0)).getTime();const t=Date.parse(s);return isNaN(t)?(fb||0):t;}
+const PESO={erro:6,venc:3,avaria:4,saldo:2};
+const RUAS_FORA=new Set(["14","15","21","31","50","51","52","53","54"]);
+function pesoRec(o){let p=0;if(pbool(o.Erro_Produto))p+=PESO.erro;if(pbool(o.Prox_Vencimento))p+=PESO.venc;if(pbool(o.Avaria))p+=PESO.avaria;if(pbool(o.Sem_Saldo))p+=PESO.saldo;return p||(pbool(o.Possui_NC)?1:0);}
 function normRec(o){const end=fmtAddr(o.Endereco||"");const rua=unz(o.Rua)||end.split("-")[0]||"";
   return {id:String(o.ID_Auditoria||""),ts:o.ts?+o.ts:pts(o.DataHora,pts(o.Recebido_Em)),rua:String(rua),end,nc:pbool(o.Possui_NC),sess:String(o.ID_Sessao||""),
-    mat:String(o.Matricula_Colaborador_NC||""),val:pnum(o.Valor_Divergencia),qtd:pnum(o.Qtd_Divergencia_Un),aud:o.Nome_Auditor||""};}
+    mat:String(o.Matricula_Colaborador_NC||""),val:pnum(o.Valor_Divergencia),qtd:pnum(o.Qtd_Divergencia_Un),aud:o.Nome_Auditor||"",peso:pesoRec(o)};}
 let PAINEL_ROWS=null,PAINEL_INFO="",painelMode="mes",ruaSel=null,painelBusy=false;
 function painelRecs(){const m=new Map();(PAINEL_ROWS||[]).forEach(o=>{const r=normRec(o);if(r.id&&r.ts)m.set(r.id,r);});return [...m.values()];}
 function ciclos(recs){const by={};
-  recs.forEach(r=>{if(!r.rua)return;const d=new Date(r.ts);const day=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());const k=r.rua+"|"+(r.sess||day);(by[k]=by[k]||{rua:r.rua,recs:[]}).recs.push(r);});
+  recs.forEach(r=>{if(!r.rua||RUAS_FORA.has(r.rua))return;const d=new Date(r.ts);const day=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());const k=r.rua+"|"+(r.sess||day);(by[k]=by[k]||{rua:r.rua,recs:[]}).recs.push(r);});
   const T=ruaTotMap(),pr={};
-  Object.values(by).forEach(c=>{const ends=new Set(),nce=new Set();let val=0,ts=Infinity,te=0;const auds=new Set();
-    c.recs.forEach(r=>{ends.add(r.end);if(r.nc){nce.add(r.end);val+=r.val;}ts=Math.min(ts,r.ts);te=Math.max(te,r.ts);if(r.aud)auds.add(r.aud);});
-    const tot=Math.max(T[c.rua]||0,ends.size)||1;Object.assign(c,{ts,te,aud:ends.size,nc:nce.size,tot,val,q:Math.max(0,1-nce.size/tot),cob:Math.min(1,ends.size/tot),auditores:[...auds]});
+  Object.values(by).forEach(c=>{const ends=new Set(),nce=new Set(),pe={};let val=0,ts=Infinity,te=0;const auds=new Set();
+    c.recs.forEach(r=>{ends.add(r.end);if(r.nc){nce.add(r.end);val+=r.val;pe[r.end]=Math.max(pe[r.end]||0,r.peso||1);}ts=Math.min(ts,r.ts);te=Math.max(te,r.ts);if(r.aud)auds.add(r.aud);});
+    const tot=Math.max(T[c.rua]||0,ends.size)||1,pontos=Object.values(pe).reduce((a,b)=>a+b,0);Object.assign(c,{ts,te,aud:ends.size,nc:nce.size,pontos,tot,val,q:Math.max(0,1-pontos/tot),cob:Math.min(1,ends.size/tot),auditores:[...auds]});
     (pr[c.rua]=pr[c.rua]||[]).push(c);});
   Object.values(pr).forEach(a=>a.sort((x,y)=>x.ts-y.ts));return pr;}
 function prever(vals){const v=vals.filter(x=>x!=null).slice(-6);if(!v.length)return null;if(v.length<2)return v[0];const n=v.length;let sx=0,sy=0,sxy=0,sxx=0;
@@ -531,8 +537,8 @@ function periodKey(ts,mode){const d=new Date(ts);if(mode==="mes")return d.getFul
 const MESES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 function perLabel(k,mode){const p=k.split("-");return mode==="mes"?MESES[+p[1]-1]+"/"+p[0].slice(2):p[2]+"/"+p[1];}
 function porPeriodo(pr,mode){const P={};Object.values(pr).forEach(cs=>{const last={};cs.forEach(c=>{last[periodKey(c.ts,mode)]=c;});
-  Object.entries(last).forEach(([k,c])=>{const x=P[k]=P[k]||{k,nc:0,tot:0,ruas:0,val:0};x.nc+=c.nc;x.tot+=c.tot;x.ruas++;x.val+=c.val;});});
-  return Object.values(P).sort((a,b)=>a.k<b.k?-1:1).map(p=>(p.q=1-p.nc/p.tot,p));}
+  Object.entries(last).forEach(([k,c])=>{const x=P[k]=P[k]||{k,nc:0,pt:0,tot:0,ruas:0,val:0};x.nc+=c.nc;x.pt+=c.pontos||0;x.tot+=c.tot;x.ruas++;x.val+=c.val;});});
+  return Object.values(P).sort((a,b)=>a.k<b.k?-1:1).map(p=>(p.q=Math.max(0,1-p.pt/p.tot),p));}
 const qClass=q=>{if(q==null)return "q-na";q*=100;return q>=98?"q5":q>=95?"q4":q>=90?"q3":q>=80?"q2":"q1";};
 const pct=q=>q==null?"–":(Math.round(q*1000)/10).toLocaleString("pt-BR",{minimumFractionDigits:1})+"%";
 const pp=d=>(d>0?"+":"")+(Math.round(d*1000)/10).toLocaleString("pt-BR",{minimumFractionDigits:1})+" p.p.";
@@ -550,14 +556,14 @@ function chartSVG(per,prevq,mode){const L=per.slice(-8);if(!L.length)return '<di
     s+='<text x="'+(x+w/2)+'" y="'+(H-pb+13)+'" font-size="9" text-anchor="middle">'+i.lab+'</text>';
     if(i.sub)s+='<text x="'+(x+w/2)+'" y="'+(H-pb+24)+'" font-size="8" text-anchor="middle">'+i.sub+'</text>';});
   return s+'</svg>';}
-function ranking(pr){return QUADRO.filter(q=>q.ruas.length).map(q=>{let nc=0,tot=0,val=0,pnc=0,ptot=0,aud=0,last=0;
-    q.ruas.forEach(r=>{const cs=pr[r];if(!cs||!cs.length)return;const c=cs[cs.length-1];aud++;nc+=c.nc;tot+=c.tot;val+=c.val;last=Math.max(last,c.te);const p=cs[cs.length-2];if(p){pnc+=p.nc;ptot+=p.tot;}});
-    return {mat:q.mat,nome:nomeC(q.mat),ruas:q.ruas,aud,q:tot?1-nc/tot:null,pq:ptot?1-pnc/ptot:null,nc,val,tot,last};})
+function ranking(pr){return QUADRO.map(q=>({q,ru:q.ruas.filter(r=>!RUAS_FORA.has(r))})).filter(o=>o.ru.length).map(({q,ru})=>{let nc=0,pt=0,tot=0,val=0,ppt=0,ptot=0,aud=0,last=0;
+    ru.forEach(r=>{const cs=pr[r];if(!cs||!cs.length)return;const c=cs[cs.length-1];aud++;nc+=c.nc;pt+=c.pontos||0;tot+=c.tot;val+=c.val;last=Math.max(last,c.te);const p=cs[cs.length-2];if(p){ppt+=p.pontos||0;ptot+=p.tot;}});
+    return {mat:q.mat,nome:nomeC(q.mat),ruas:ru,aud,q:tot?Math.max(0,1-pt/tot):null,pq:ptot?Math.max(0,1-ppt/ptot):null,nc,val,tot,last};})
   .sort((a,b)=>(a.q==null)-(b.q==null)||(b.q||0)-(a.q||0)||a.val-b.val);}
 function renderPainel(){
   const box=$("painel");if(!box)return;
   const recs=painelRecs(),pr=ciclos(recs),T=ruaTotMap();
-  const ruasAll=[...new Set(Object.keys(T).concat(QUADRO.flatMap(q=>q.ruas)).concat(Object.keys(pr)))].sort((a,b)=>a-b);
+  const ruasAll=[...new Set(Object.keys(T).concat(QUADRO.flatMap(q=>q.ruas)).concat(Object.keys(pr)))].filter(r=>!RUAS_FORA.has(r)).sort((a,b)=>a-b);
   let nc=0,tot=0,val=0,aud=0,ruasBase=Object.keys(T).length;
   ruasAll.forEach(r=>{const cs=pr[r];if(!cs)return;const c=cs[cs.length-1];nc+=c.nc;tot+=c.tot;val+=c.val;aud++;});
   const qg=tot?1-nc/tot:null,per=porPeriodo(pr,painelMode),prevq=prever(per.map(p=>p.q));
@@ -574,7 +580,7 @@ function renderPainel(){
   h+='<div class="block"><h3>Mapa de ruas <small>toque numa rua</small></h3><div class="rgrid">'+ruasAll.map(r=>{const cs=pr[r]||[],c=cs[cs.length-1],p=cs[cs.length-2],d=c&&p?c.q-p.q:null;
       return '<button type="button" class="rq '+qClass(c?c.q:null)+(ruaSel===r?' sel':'')+'" data-r="'+r+'" aria-label="Rua '+r+' qualidade '+(c?pct(c.q):'sem auditoria')+'"><i>'+seta(d)+'</i><b>'+r+'</b><span>'+(c?pct(c.q):'—')+'</span></button>';}).join("")+'</div>'+
     '<div class="leg"><span><i class="q5"></i>≥ 98%</span><span><i class="q4"></i>95–98%</span><span><i class="q3"></i>90–95%</span><span><i class="q2"></i>80–90%</span><span><i class="q1"></i>&lt; 80%</span><span><i class="q-na"></i>sem auditoria</span></div>'+
-    '<p class="note">Qualidade = 1 − (endereços com NC ÷ endereços da rua na 8022). ▲▼ comparam com a auditoria anterior da rua.</p><div id="pn-rua"></div></div>';
+    '<p class="note">Qualidade = 1 − (pontos das ocorrências ÷ endereços da rua na 8022). Pesos: picking errado 6, avaria 4, vencimento 3, sem saldo 2. ▲▼ comparam com a auditoria anterior da rua.</p><div id="pn-rua"></div></div>';
   // evolução
   h+='<div class="block"><h3>Evolução e previsão</h3><div class="seg" role="group" aria-label="Agrupar por"><button type="button" data-pm="semana" aria-pressed="'+(painelMode==="semana")+'">Por semana</button><button type="button" data-pm="mes" aria-pressed="'+(painelMode==="mes")+'">Por mês</button></div>'+
      '<div class="chart">'+chartSVG(per,prevq,painelMode)+'</div>'+
@@ -725,7 +731,7 @@ function fxDonut(parts,centro){const tot=parts.reduce((a,p)=>a+p.v,0);if(!tot)re
     parts.map(p=>'<li><i style="background:'+p.c+'"></i>'+esc(p.l)+' <b>'+(p.txt||p.v)+'</b> <small>'+Math.round(p.v/tot*100)+'%</small></li>').join("")+'</ul></div>';}
 function fxLegenda(){return '<div class="fx-leg"><b>LEGENDA:</b><span class="s-ot">● ≥95% Ótima</span><span class="s-rg">● 85–94% Regular</span><span class="s-at">● 70–84% Atenção</span><span class="s-cr">● &lt;70% Crítica</span><span class="s-na">Não auditada</span></div>';}
 function fxMapa(qRua,rotulo){const T=ruaTotMap();const max=Math.max(50,...Object.keys(T).map(Number),...Object.keys(qRua).map(Number));
-  return fxLegenda()+BLOCOS.filter(b=>b[1]<=max).map(([nm,a,z])=>{const rs=[];for(let r=a;r<=Math.min(z,max);r++)rs.push(String(r));
+  return fxLegenda()+BLOCOS.filter(b=>b[1]<=max).map(([nm,a,z])=>{const rs=[];for(let r=a;r<=Math.min(z,max);r++)if(!RUAS_FORA.has(String(r))&&(r<=55||T[String(r)]))rs.push(String(r));if(!rs.length)return "";
     const qs=rs.map(r=>qRua[r]).filter(q=>q!=null);const med=qs.length?qs.reduce((x,y)=>x+y,0)/qs.length:null;
     return '<div class="fx-bl" style="color:'+(med==null?"#64748B":FXC[fxCls(med)])+'">Bloco '+nm+' <span>'+(med==null?"—":pc1(med))+'</span></div><div class="fx-sq">'+
       rs.map(r=>{const q=qRua[r];return '<div class="s-'+fxCls(q)+'"><span>'+r+'</span><small>'+(q==null?"—":pc0(q))+'</small></div>';}).join("")+'</div>';}).join("")+(rotulo?'<p class="fx-e" style="margin-top:8px">'+rotulo+'</p>':'');}
@@ -749,7 +755,7 @@ function fxRuas(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.ruas),tit="Quali
   return fxHead(tit,rows.length)+
     fxKpis([{t:"Auditorias",v:nCiclos},{t:"Qualidade média",v:pc1(qm),c:qm==null?"#64748B":FXC[fxCls(qm)]},{t:"Ocorrências",v:ocorr,c:"#DC2626"},
       {t:"Ruas auditadas",v:Object.keys(ult).length,c:"#0F172A",s:"de "+totRuas+" possíveis"},{t:"Ruas críticas <85%",v:crit.length,c:"#DC2626",s:"requer ação",sc:"#DC2626"},{t:"Valor em divergência",v:BRL0(val),c:"#B45309"}])+
-    '<div class="fx-g"><div class="fx-col">'+fxCard("Mapa de qualidade por bloco",fxMapa(qRua))+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Mapa de qualidade por bloco",fxMapa(qRua,"Qualidade = 1 − (pontos ÷ endereços da rua). Pesos: picking errado 6, avaria 4, vencimento 3, sem saldo 2."))+
       '<div class="fx-g2">'+fxCard("Ocorrências por tipo",fxDonut(tipos))+fxCard("Evolução da qualidade (por dia)",fxCols(dias))+'</div></div>'+
     '<div class="fx-col">'+fxCard("Ruas críticas (&lt;85%)",fxChips(crit.map(([r,c])=>[r,c.q,blocoDe(r)])))+
       fxCard("Repositores — acuracidade",fxBars(reps.map(x=>({l:x.q.mat+" - "+curto(nomeC(x.q.mat)),v:x.acc,txt:pc1(x.acc),c:FXC[fxCls(x.acc)]})),{max:1}))+
@@ -757,7 +763,7 @@ function fxRuas(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.ruas),tit="Quali
       fxCard("Maiores divergências por rua (R$)",fxBars(Object.entries(valRua).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([r,v])=>({l:"Rua "+r,v,txt:BRL0(v),c:"#B45309"}))))+'</div></div>'+fxFoot("Qualidade de Ruas");}
 
 /* ---- Retorno ---- */
-function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).map(r=>Object.assign(r,{_nc:pbool(r.Possui_NC),_rua:unz(r.Rua),_qe:pnum(r.Qtd_Etiqueta),_qf:pnum(r.Qtd_Fisico),_vt:pnum(r.Valor_Total),_vd:pnum(r.Valor_Divergencia),_du:pnum(r.Divergencia_Un)})),tit="Auditoria de Retorno — Fechamento";
+function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r=>!RUAS_FORA.has(unz(r.Rua))).map(r=>Object.assign(r,{_nc:pbool(r.Possui_NC),_rua:unz(r.Rua),_qe:pnum(r.Qtd_Etiqueta),_qf:pnum(r.Qtd_Fisico),_vt:pnum(r.Valor_Total),_vd:pnum(r.Valor_Divergencia),_du:pnum(r.Divergencia_Un)})),tit="Auditoria de Retorno — Fechamento";
   const conf=rows.filter(r=>!r._nc).length,q=rows.length?conf/rows.length:null,vt=rows.reduce((a,r)=>a+r._vt,0),vd=rows.reduce((a,r)=>a+r._vd,0),venc=rows.filter(r=>pbool(r.Prox_Vencimento)).length;
   const porRua={};rows.forEach(r=>{const x=porRua[r._rua]=porRua[r._rua]||{n:0,c:0,vd:0,vt:0};x.n++;if(!r._nc)x.c++;x.vd+=r._vd;x.vt+=r._vt;});
   const qRua={};Object.entries(porRua).forEach(([r,x])=>qRua[r]=x.c/x.n);
@@ -817,7 +823,7 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
     a._dif=a._qf-a._qe;a._ok=Math.abs(a._dif)<=marg;});
   const ruas={};const R=k=>ruas[k]=ruas[k]||{os:0,aud:0,ok:0,qe:0,qf:0,cob:0};
   rot.forEach(o=>R(o.rua).os++);aud.forEach(a=>{const k=a._rot?a._rot.rua:a._rua;const x=R(k);x.aud++;if(a._ok)x.ok++;x.qe+=a._qe;x.qf+=a._qf;if(a._rot)x.cob++;});
-  const qRua={};Object.entries(ruas).forEach(([k,x])=>{if(x.aud)qRua[k]=x.ok/x.aud;});
+  Object.keys(ruas).forEach(k=>{if(RUAS_FORA.has(k))delete ruas[k];});const qRua={};Object.entries(ruas).forEach(([k,x])=>{if(x.aud)qRua[k]=x.ok/x.aud;});
   const reps={};const P=(k,n)=>reps[k]=reps[k]||{n,os:0,aud:0,ok:0,dif:0};
   rot.forEach(o=>P(o.func||o.nome,o.nome).os++);aud.forEach(a=>{if(!a._rot)return;const x=P(a._rot.func||a._rot.nome,a._rot.nome);x.aud++;if(a._ok)x.ok++;x.dif+=a._dif;});
   const nAud=aud.length,nOk=aud.filter(a=>a._ok).length,nMatch=aud.filter(a=>a._rot).length,q=nAud?nOk/nAud:null,cob=rot.length?nMatch/rot.length:null;
@@ -898,8 +904,47 @@ async function imprimirNCsPlanilha(){if(!temPerm("aud_adm")){toast("Somente admi
       short:"Não conformidades da planilha – "+per.lab,text:"*NÃO CONFORMIDADES – PLANILHA*\nPeríodo: "+per.lab});}
   catch(e){toast(e.message||"Não foi possível ler a planilha.");}
   finally{bt.disabled=false;bt.textContent=old;}}
-function paintXnc(){const b=$("x-nc");if(b)b.hidden=!temPerm("aud_adm");}
+function paintXnc(){const b=$("f-fonte");if(b)b.hidden=!temPerm("aud_adm");}
 
+
+// registros: todas as auditorias, fonte (aparelho/planilha), impressão e exclusão
+var REG={rows:null,busy:false,info:""};
+function regFonte(){return typeof temPerm==="function"&&LOGIN&&temPerm("aud_adm")&&$("f-fonte").value==="planilha"?"planilha":"local";}
+function sheetRecs(){const j=REG.rows;if(!j)return [];const B=(r,ks)=>{ks.forEach(k=>{if(k in r)r[k]=pbool(r[k]);});return r;};
+  return [].concat(fxRows(j.ruas).map(r=>B(Object.assign(r,{_aba:"ruas",_sheet:1}),["Possui_NC","Erro_Produto","Prox_Vencimento","Sem_Saldo","Avaria"])),
+    fxRows(j.retorno).map(r=>B(Object.assign(r,{_aba:"retorno",_sheet:1}),["Possui_NC","Prox_Vencimento"])),
+    fxRows(j.cargas).map(r=>Object.assign(r,{_aba:"cargas",_sheet:1,Possui_NC:true,Status_NC:r.Status_NC||"Aberta"}))).sort((a,b)=>b.ts-a.ts);}
+async function carregarReg(manual){if(REG.busy)return;if(DEMO||!SHEET_URL){REG.info="A planilha só é lida pelo site, com login.";renderRecords();return;}
+  if(!navigator.onLine){REG.info=REG.rows?"Sem internet: mostrando a última cópia da planilha.":"Sem internet.";renderRecords();return;}
+  REG.busy=true;REG.info="Lendo a planilha Google…";renderRecords();
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=fechamento&token="+encodeURIComponent((LOGIN&&LOGIN.token)||"")+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+    if(j&&j.ok&&j.ruas){REG.rows=j;REG.info="Planilha Google · atualizado "+fmtDT(new Date()).slice(0,16);if(manual)toast("Registros atualizados com a planilha.");}else REG.info=(j&&j.erro)||"Atualize o Apps Script para a versão 14.";}
+  catch(e){REG.info="Sem conexão com a planilha.";}REG.busy=false;renderRecords();}
+function ncListaHTML(L,lab,tit){const ruas=L.filter(r=>(r._aba||"ruas")==="ruas").sort((a,b)=>a.ts-b.ts),ret=L.filter(r=>r._aba==="retorno").sort((a,b)=>a.ts-b.ts),car=L.filter(r=>r._aba==="cargas").sort((a,b)=>a.ts-b.ts);
+  const oc=r=>[pbool(r.Erro_Produto)?"Lugar errado"+(r.Endereco_Correto?" (correto "+fmtAddr(r.Endereco_Correto)+")":""):"",pbool(r.Prox_Vencimento)?"Vencimento"+(r.Data_Vencimento?" "+r.Data_Vencimento:""):"",pbool(r.Sem_Saldo)?"Sem saldo":"",pbool(r.Avaria)?"Avaria"+(r.Tipo_Avaria?" ("+r.Tipo_Avaria+")":""):""].filter(Boolean).join("; ")||"Conforme";
+  const dt=r=>String(r.DataHora||"").slice(0,16);const soma=(X,k)=>X.reduce((a,r)=>a+pnum(r[k]),0);
+  const sec=(t,head,rows,tot)=>rows.length?'<div class="fx-c" style="margin-top:10px"><h3>'+t+' <span style="float:right;color:#64748B">'+rows.length+' registro'+(rows.length===1?'':'s')+(tot?' · '+tot:'')+'</span></h3>'+fxTable(head,rows)+'</div>':'';
+  const k=[];if(ruas.length)k.push({t:"Ruas",v:ruas.length,c:"#DC2626",s:BRL0(soma(ruas,"Valor_Divergencia"))});if(ret.length)k.push({t:"Retorno",v:ret.length,c:"#DC2626",s:BRL0(soma(ret,"Valor_Divergencia"))});if(car.length)k.push({t:"Cargas",v:car.length,c:"#DC2626",s:BRL0(soma(car,"Valor_Total"))});k.push({t:"Total",v:L.length,c:"#0F172A"});
+  return '<div class="fx-h"><div><h1>'+esc(tit)+'</h1><p>Período: <b>'+esc(lab)+'</b></p></div><div class="r">Gerado: <b>'+fmtDT(new Date())+'</b><br>Por: <b>'+esc(nomeAud())+'</b></div></div>'+fxKpis(k)+
+    sec("Auditoria de ruas",[{t:"Data"},{t:"Endereço"},{t:"Item"},{t:"Ocorrência"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Repositor"},{t:"Auditor"},{t:"Status"}],
+      ruas.map(r=>[dt(r),'<b>'+esc(fmtAddr(r.Endereco))+'</b>',esc((r.Produto||"")+(r.Descricao_Produto?" – "+String(r.Descricao_Produto).slice(0,30):"")),esc(oc(r)),pnum(r.Qtd_Divergencia_Un),BRL0(pnum(r.Valor_Divergencia)),esc(curto(r.Nome_Colaborador_NC||"")),esc(curto(r.Nome_Auditor||"")),esc(r.Status_NC||"")]),BRL0(soma(ruas,"Valor_Divergencia")))+
+    sec("Auditoria de retorno",[{t:"Data"},{t:"Rua"},{t:"O.S."},{t:"Item"},{t:"Etiq.",n:1},{t:"Fís.",n:1},{t:"Dif.",n:1},{t:"Valor div.",n:1},{t:"Ocorrência"},{t:"Responsável"},{t:"Status"}],
+      ret.map(r=>{const d=pnum(r.Divergencia_Un);return [dt(r),esc(unz(r.Rua)),esc(r.Numero_OS||""),esc(r.Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),pnum(r.Qtd_Etiqueta),pnum(r.Qtd_Fisico),(d>0?"+":"")+d,BRL0(pnum(r.Valor_Divergencia)),esc([d?"Divergência":"",pbool(r.Prox_Vencimento)?"Vencimento":""].filter(Boolean).join("; ")||(pbool(r.Possui_NC)?"Não conforme":"Conforme")),esc(curto(r.Nome_Colaborador_NC||"")),esc(r.Status_NC||"")];}),BRL0(soma(ret,"Valor_Divergencia")))+
+    sec("Auditoria de cargas",[{t:"Data"},{t:"O.S."},{t:"Box"},{t:"Item"},{t:"Motivo"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Causador"},{t:"Conferente"}],
+      car.map(r=>[dt(r),esc(r.Numero_OS),esc(r.Box),esc(r.Codigo_Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),esc(r.Motivo),pnum(r.Quantidade),BRL0(pnum(r.Valor_Total)),esc((r.Causador?r.Causador+": ":"")+curto(r.Nome_Causador||"")),esc(curto(r.Nome_Conferente||""))]),BRL0(soma(car,"Valor_Total")))+
+    '<div class="fx-f"><span>'+esc(tit)+' · '+esc(lab)+'</span><span>Santa Therezinha</span></div>';}
+function imprimirLista(){const L=filtered();if(!L.length){toast("Nada para imprimir com estes filtros.");return;}const per=regPeriodo();
+  const tp=$("f-tipo").value,tit=tp==="nc"?"Não conformidades":tp==="ok"?"Lançamentos conformes":"Registros de auditoria";const fonte=regFonte()==="planilha"?" (planilha)":"";
+  openDoc({html:'<div class="pd fx">'+ncListaHTML(L,per.lab,tit+fonte)+'</div>',multi:true,land:true,name:tit.replace(/\s+/g,"_")+"_"+todayISO()+".pdf",title:tit,short:tit+" – "+per.lab,text:"*"+tit.toUpperCase()+"*\nPeríodo: "+per.lab});}
+async function excluirRegistro(id,aba){if(!temPerm("aud_adm"))return;if(!confirm("Excluir este registro do aparelho e da planilha Google? Não dá para desfazer."))return;
+  let ok=true;if(!DEMO&&SHEET_URL){if(!navigator.onLine){toast("Sem internet: não dá para excluir da planilha agora.");return;}
+    try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"admin_excluir",token:LOGIN.token,aba,id}),redirect:"follow",cache:"no-store"});const j=await r.json();if(!j.ok){ok=false;toast(j.erro||"Não foi possível excluir na planilha.");}}catch(e){ok=false;toast("Não foi possível falar com a planilha.");}}
+  if(!ok)return;HIST.delete(id);IDB.del(id).catch(()=>{});const qi=queue.findIndex(x=>x.rec.ID_Auditoria===id);if(qi>=0){queue.splice(qi,1);saveQueue();}
+  remote.ruas=remote.ruas.filter(r=>r.ID_Auditoria!==id);
+  if(REG.rows){["ruas","retorno","cargas"].forEach(k=>{const b=REG.rows[k];if(b&&b.registros){const i0=b.colunas.indexOf("ID_Auditoria");b.registros=b.registros.filter(x=>String(x[i0])!==id);}});}
+  toast("Registro excluído.");renderRecords();}
+$("f-fonte").onchange=()=>{if(regFonte()==="planilha"&&!REG.rows)carregarReg();renderRecords();};
+$("x-pr").onclick=imprimirLista;
 
 // auditoria de retorno (por rua, vários lançamentos)
 let SR=store.get("audcd_sessao_ret",null);
