@@ -349,6 +349,8 @@ nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}
 .fxbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .fxbar .fx-tabs{display:grid;grid-template-columns:repeat(4,auto);margin:0}.fxbar .fx-tabs button{padding:0 14px}
 .fxbar label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:.9rem}.fxbar .in{min-height:44px;padding:6px 8px;width:auto}
+.fx-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:start}
+.fx-cmp .fx-t td,.fx-cmp .fx-t th{padding:3px 5px;font-size:10px}
 .fxwrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);background:#F8FAFC}
 body.wide main,body.wide .band-in{max-width:1200px}
 nav button.desk{display:none}
