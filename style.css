@@ -307,7 +307,8 @@ nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}
 .cg-sum span{font-size:.7rem;color:var(--muted)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .cg-sum b{color:var(--ink)}}
 :root[data-theme="dark"] .cg-sum b{color:var(--ink)}
-.row3{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.row3>.field{margin-top:0}
 .fx{max-width:none!important;width:1123px;box-sizing:border-box;padding:16px 20px!important;background:#F8FAFC!important;color:#0F172A;font:12px/1.35 Arial,Helvetica,sans-serif;text-align:left}
 .fx *{box-sizing:border-box}
 .fx-h{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#1E3A8A,#0E7490);color:#fff;border-radius:10px;padding:14px 18px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
