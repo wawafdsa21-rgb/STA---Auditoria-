@@ -367,3 +367,4 @@ nav button.desk{display:none}
 .cxun.semcx [data-w="cx"]{opacity:.45}
 #r-cx-hint,#t-cx-h,#g-cx-h{display:none}
 .row2q{grid-template-columns:1fr!important}
+#print .docsep+.docsep{page-break-before:always;break-before:page;margin-top:16px}

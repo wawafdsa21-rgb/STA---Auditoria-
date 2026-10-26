@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 14)
+ * Auditoria STA – Santa Therezinha (versão 15)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -124,9 +124,9 @@ function doGet(e) {
         ok: true,
         ruas: lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
           'Sem_Saldo', 'Avaria', 'Possui_NC', 'Qtd_Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em',
-          'Produto', 'Descricao_Produto', 'Endereco_Correto', 'Data_Vencimento', 'Tipo_Avaria', 'Vl_Ult_Entrada', 'Observacao']),
+          'Produto', 'Descricao_Produto', 'Endereco_Correto', 'Data_Vencimento', 'Tipo_Avaria', 'Vl_Ult_Entrada', 'Observacao', 'Predio', 'Nivel', 'Apto', 'Funcao_Colaborador_NC']),
         retorno: lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
-          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS', 'Data_Vencimento', 'Observacao']),
+          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS', 'Data_Vencimento', 'Observacao', 'Vl_Ult_Entrada', 'Funcao_Colaborador_NC']),
         rotina: lerRotina(ss, 400),
         cargas: lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
           'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
@@ -138,7 +138,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 14, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 15, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
