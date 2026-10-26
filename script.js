@@ -107,11 +107,11 @@ let queue=store.get("audcd_fila",[]).filter(x=>x.col==="ruas");
 // login e permissões
 const DEMO=!!window.claude;
 let LOGIN=DEMO?{demo:true,perms:["aud_rua","aud_ret","aud_car"]}:store.get("audcd_login",null);
-const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car",admin:"aud_adm"};
+const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car",admin:"aud_adm",fechamento:"aud_adm"};
 const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
 const podeVer=v=>!VIEW_PERM[v]||temPerm(VIEW_PERM[v]);
 function primeiraTela(){return ["ruas","retorno","cargas"].find(podeVer)||"registros";}
-function aplicarPerms(){let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok)n++;});
+function aplicarPerms(){let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok&&!(b.classList.contains("desk")&&innerWidth<900))n++;});
   document.querySelector("nav").style.setProperty("--nav-n",n);document.querySelector("nav").dataset.n=n;
   const fa=$("f-aba");if(fa){[...fa.options].forEach(o=>o.hidden=!podeVer(o.value));if(!podeVer(fa.value)){const o=[...fa.options].find(x=>podeVer(x.value));if(o)fa.value=o.value;}}}
 async function sha256(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");}catch(e){return "";}}
@@ -162,8 +162,8 @@ $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("she
 paintWho(); if(DEMO&&!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Inicie a rua e lance todos os retornos antes de finalizar."],cargas:["Auditoria de cargas","Informe Box, O.S. e conferente e lance os itens da carga."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
-function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();if(v==="cargas")paintCG();["ruas","retorno","cargas","admin","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);if(v==="admin")carregarAdmin();if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Inicie a rua e lance todos os retornos antes de finalizar."],cargas:["Auditoria de cargas","Informe Box, O.S. e conferente e lance os itens da carga."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],fechamento:["Fechamento","KPIs e gráficos de cada auditoria, para computador e impressão."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();if(v==="cargas")paintCG();["ruas","retorno","cargas","admin","fechamento","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);document.body.classList.toggle("wide",v==="fechamento");if(v==="admin")carregarAdmin();if(v==="fechamento"){renderFech();carregarFech();}if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
@@ -644,7 +644,7 @@ function cardUsuario(u,idx){const ativo=Object.values(u.perms).some(s=>s==="Ativ
     '<div class="au-b"><button type="button" class="btn" data-f="tudo">'+(ativo?'Bloquear tudo':'Liberar acessos')+'</button><button type="button" class="save" data-f="salvar" style="min-height:48px;font-size:1.15rem;margin:0" disabled>Salvar</button></div></div>';}
 function renderAdmin(){const box=$("adm");if(!ADM.lista){box.innerHTML='<div class="empty">'+esc(ADM.msg||"Não foi possível carregar.")+'<br><button type="button" class="btn" id="adm-rt" style="margin-top:10px">Tentar de novo</button></div>';$("adm-rt").onclick=carregarAdmin;return;}
   const f=norm(ADM.filtro||"");const L=ADM.lista.map((u,i)=>[u,i]).filter(([u])=>!f||u.matricula.includes(f)||norm(u.nome||(cIdx.has(u.matricula)?C.nome[cIdx.get(u.matricula)]:"")).includes(f));
-  let h=(ADM.msg?'<p class="err" style="margin:0 0 10px">'+esc(ADM.msg)+'</p>':'')+
+  let h='<button type="button" class="save" id="adm-fech" style="margin:0 0 12px">Fechamento das auditorias (KPIs e gráficos)</button>'+(ADM.msg?'<p class="err" style="margin:0 0 10px">'+esc(ADM.msg)+'</p>':'')+
     '<div class="adm-top"><input class="in" id="adm-q" type="search" placeholder="Buscar matrícula ou nome" value="'+esc(ADM.filtro)+'"><button type="button" class="btn" id="adm-novo">+ Novo</button></div>'+
     '<p class="note" style="margin:-4px 0 10px">'+ADM.lista.length+' usuário'+(ADM.lista.length!==1?'s':'')+'. As alterações são gravadas na aba <b>Permissionamento</b>. Bloquear mantém a linha na planilha com Status = Bloqueado.</p>';
   if(ADM.novo)h+='<div class="block au dirty" id="adm-new"><div class="au-h"><b>Novo usuário</b></div><div class="field" style="margin:0 0 8px"><label>Colaborador</label><div id="an-pick"></div></div>'+
@@ -653,6 +653,7 @@ function renderAdmin(){const box=$("adm");if(!ADM.lista){box.innerHTML='<div cla
     '<div class="au-b"><button type="button" class="btn" id="an-x">Cancelar</button><button type="button" class="save" id="an-ok" style="min-height:48px;font-size:1.15rem;margin:0">Criar acesso</button></div></div>';
   h+=L.length?L.map(([u,i])=>cardUsuario(u,i)).join(""):'<div class="empty">Nenhum usuário encontrado.</div>';
   box.innerHTML=h;
+  $("adm-fech").onclick=()=>go("fechamento");
   $("adm-q").oninput=e=>{ADM.filtro=e.target.value;const pos=e.target.selectionStart;renderAdmin();const q=$("adm-q");q.focus();try{q.setSelectionRange(pos,pos);}catch(x){}};
   $("adm-novo").onclick=()=>{ADM.novo=true;renderAdmin();$("an-mat").focus();};
   if(ADM.novo){const nb=$("adm-new");const pk=picker($("an-pick"),{ph:"Buscar no quadro (opcional)",search:searchColab,describe:descColab,onPick:k=>{if(k!=null){$("an-mat").value=C.mat[k];const s="aud"+C.mat[k].slice(-4);if(!$("an-sen").value)$("an-sen").value=s;}}});
@@ -681,6 +682,144 @@ async function salvarUsuario(d,bt){d.matricula=String(d.matricula||"").replace(/
   try{await admPost(Object.assign({acao:"admin_salvar"},d));toast(d.original?"Acesso atualizado na planilha.":"Usuário criado na planilha.");ADM.novo=false;
     if(d.original===LOGIN.mat)setTimeout(revalidar,300);await carregarAdmin();}
   catch(e){toast(e.message);bt.disabled=false;bt.textContent=old;}}
+
+// ---------- Fechamento (administração, computador) ----------
+const hojeISO=()=>todayISO();
+const iniMesISO=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-01";};
+let FECH={tipo:"ruas",de:iniMesISO(),ate:hojeISO(),dados:null,info:"",busy:false};
+const BLOCOS=[["A",1,20],["B",21,30],["C",31,40],["D",41,50],["E",51,60]];
+const fxCls=q=>q==null?"na":q>=.95?"ot":q>=.85?"rg":q>=.70?"at":"cr";
+const FXC={ot:"#16A34A",rg:"#CA8A04",at:"#EA580C",cr:"#DC2626",na:"#94A3B8"};
+const pc1=q=>q==null?"—":(Math.round(q*1000)/10).toLocaleString("pt-BR",{minimumFractionDigits:1})+"%";
+const pc0=q=>q==null?"—":Math.round(q*100)+"%";
+const fdISO=iso=>{if(!iso)return "";const [y,m,d]=iso.split("-");return d+"/"+m+"/"+y;};
+const BRL0=v=>BRL.format(v||0);
+function fxRows(blk){if(!blk||!Array.isArray(blk.registros)||!blk.colunas)return [];return blk.registros.map(r=>{const o={};blk.colunas.forEach((c,i)=>o[c]=r[i]);o.ts=pts(o.DataHora,pts(o.Recebido_Em));return o;}).filter(o=>o.ID_Auditoria&&o.ts);}
+function fxPeriodo(){const de=FECH.de?dayStart(FECH.de):0,ate=FECH.ate?dayStart(FECH.ate)+864e5:Infinity;return [de,ate];}
+function fxNoPeriodo(blk){const [de,ate]=fxPeriodo();return fxRows(blk).filter(o=>o.ts>=de&&o.ts<ate);}
+const fxDia=ts=>{const d=new Date(ts);return pad(d.getDate())+"/"+pad(d.getMonth()+1);};
+const fxDiaKey=ts=>{const d=new Date(ts);return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate());};
+
+/* ---- componentes ---- */
+function fxHead(tit,n){return '<div class="fx-h"><div><h1>'+esc(tit)+'</h1><p>Período: <b>'+fdISO(FECH.de)+' a '+fdISO(FECH.ate)+'</b></p></div><div class="r">Gerado: <b>'+fmtDT(new Date())+'</b><br>Total de registros: <b>'+n+'</b></div></div>';}
+function fxKpis(list){return '<div class="fx-k" style="grid-template-columns:repeat('+list.length+',1fr)">'+list.map(k=>'<div><span>'+k.t+'</span><b style="color:'+(k.c||"#1E40AF")+'">'+k.v+'</b>'+(k.s?'<small style="color:'+(k.sc||"#64748B")+'">'+k.s+'</small>':'')+'</div>').join("")+'</div>';}
+function fxCard(t,body,extra){return '<div class="fx-c"'+(extra?' style="'+extra+'"':'')+'><h3>'+t+'</h3>'+body+'</div>';}
+function fxBars(items,opt){opt=opt||{};if(!items.length)return '<p class="fx-e">Sem dados no período.</p>';
+  const max=opt.max||Math.max(...items.map(i=>Math.abs(i.v)),1);
+  return '<div class="fx-bars">'+items.map((it,i)=>'<div class="fx-br"><span class="n">'+(i+1)+'</span><span class="l" title="'+esc(it.l)+'">'+esc(it.l)+'</span><span class="t"><i style="width:'+Math.max(1,Math.round(Math.abs(it.v)/max*100))+'%;background:'+(it.c||"#2563EB")+'"></i></span><b style="color:'+(it.tc||it.c||"#1E3A8A")+'">'+it.txt+'</b></div>').join("")+'</div>';}
+function fxCols(items){if(!items.length)return '<p class="fx-e">Sem dados no período.</p>';const max=Math.max(...items.map(i=>Math.abs(i.v)),1);
+  return '<div class="fx-cols">'+items.map(it=>'<div><b>'+it.txt+'</b><i style="height:'+Math.max(2,Math.round(Math.abs(it.v)/max*100))+'%;background:'+(it.c||"#2563EB")+'"></i><span>'+esc(it.l)+'</span></div>').join("")+'</div>';}
+function fxDonut(parts,centro){const tot=parts.reduce((a,p)=>a+p.v,0);if(!tot)return '<p class="fx-e">Sem dados no período.</p>';
+  const R=40,C=2*Math.PI*R;let a=0;const segs=parts.filter(p=>p.v>0).map(p=>{const len=p.v/tot*C;const s='<circle r="'+R+'" cx="60" cy="60" fill="none" stroke="'+p.c+'" stroke-width="20" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-a).toFixed(2)+'" transform="rotate(-90 60 60)"/>';a+=len;return s;}).join("");
+  return '<div class="fx-don"><svg viewBox="0 0 120 120" width="118" height="118" role="img">'+segs+'<text x="60" y="58" text-anchor="middle" font-size="17" font-weight="700" fill="#0F172A">'+(centro!=null?centro:tot)+'</text><text x="60" y="73" text-anchor="middle" font-size="8" fill="#64748B">total</text></svg><ul>'+
+    parts.map(p=>'<li><i style="background:'+p.c+'"></i>'+esc(p.l)+' <b>'+(p.txt||p.v)+'</b> <small>'+Math.round(p.v/tot*100)+'%</small></li>').join("")+'</ul></div>';}
+function fxLegenda(){return '<div class="fx-leg"><b>LEGENDA:</b><span class="s-ot">● ≥95% Ótima</span><span class="s-rg">● 85–94% Regular</span><span class="s-at">● 70–84% Atenção</span><span class="s-cr">● &lt;70% Crítica</span><span class="s-na">Não auditada</span></div>';}
+function fxMapa(qRua,rotulo){const T=ruaTotMap();const max=Math.max(50,...Object.keys(T).map(Number),...Object.keys(qRua).map(Number));
+  return fxLegenda()+BLOCOS.filter(b=>b[1]<=max).map(([nm,a,z])=>{const rs=[];for(let r=a;r<=Math.min(z,max);r++)rs.push(String(r));
+    const qs=rs.map(r=>qRua[r]).filter(q=>q!=null);const med=qs.length?qs.reduce((x,y)=>x+y,0)/qs.length:null;
+    return '<div class="fx-bl" style="color:'+(med==null?"#64748B":FXC[fxCls(med)])+'">Bloco '+nm+' <span>'+(med==null?"—":pc1(med))+'</span></div><div class="fx-sq">'+
+      rs.map(r=>{const q=qRua[r];return '<div class="s-'+fxCls(q)+'"><span>'+r+'</span><small>'+(q==null?"—":pc0(q))+'</small></div>';}).join("")+'</div>';}).join("")+(rotulo?'<p class="fx-e" style="margin-top:8px">'+rotulo+'</p>':'');}
+function fxChips(list){return list.length?'<div class="fx-chips">'+list.map(([r,q,extra])=>'<span class="s-'+fxCls(q)+'">Rua '+esc(r)+(extra?' '+esc(extra):'')+' &nbsp;'+pc1(q)+'</span>').join("")+'</div>':'<p class="fx-e">Nenhuma rua abaixo de 85% no período.</p>';}
+function blocoDe(r){r=+r;const b=BLOCOS.find(([n,a,z])=>r>=a&&r<=z);return b?b[0]:"";}
+function fxTable(head,rows){return rows.length?'<table class="fx-t"><thead><tr>'+head.map(h=>'<th'+(h.n?' class="n"':'')+'>'+h.t+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(head[i].n?' class="n"':'')+'>'+c+'</td>').join("")+'</tr>').join("")+'</tbody></table>':'<p class="fx-e">Sem dados no período.</p>';}
+function fxFoot(tit){return '<div class="fx-f"><span>'+esc(tit)+' · Ciclo: '+fdISO(FECH.de)+' a '+fdISO(FECH.ate)+'</span><span>Gerado em '+fmtDT(new Date())+' · Santa Therezinha</span></div>';}
+function porDia(rows,fn){const m={};rows.forEach(r=>{const k=fxDiaKey(r.ts);(m[k]=m[k]||{ts:r.ts,rows:[]}).rows.push(r);});return Object.keys(m).sort().slice(-14).map(k=>fn(m[k]));}
+
+/* ---- Ruas ---- */
+function fxRuas(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.ruas),tit="Qualidade de Ruas — Fechamento de Ciclo";
+  const pr=ciclos(rows.map(normRec)),ult={};Object.entries(pr).forEach(([r,cs])=>ult[r]=cs[cs.length-1]);
+  const qRua={};Object.entries(ult).forEach(([r,c])=>qRua[r]=c.q);const qs=Object.values(qRua);const qm=qs.length?qs.reduce((a,b)=>a+b,0)/qs.length:null;
+  const nCiclos=Object.values(pr).reduce((a,cs)=>a+cs.length,0),ocorr=rows.filter(r=>pbool(r.Possui_NC)).length,totRuas=Object.keys(ruaTotMap()).length;
+  const crit=Object.entries(ult).filter(([r,c])=>c.q<.85).sort((a,b)=>a[1].q-b[1].q);const val=rows.reduce((a,r)=>a+(pbool(r.Possui_NC)?pnum(r.Valor_Divergencia):0),0);
+  const reps=QUADRO.filter(q=>q.ruas.length).map(q=>{const v=q.ruas.map(r=>qRua[r]).filter(x=>x!=null);return {q,acc:v.length?v.reduce((a,b)=>a+b,0)/v.length:null};}).filter(x=>x.acc!=null).sort((a,b)=>b.acc-a.acc);
+  const aud={};rows.forEach(r=>{const n=r.Nome_Auditor||r.Matricula_Auditor||"—";(aud[n]=aud[n]||new Set()).add(unz(r.Rua)||String(fmtAddr(r.Endereco)).split("-")[0]);});
+  const tipos=[["Produto no lugar errado","Erro_Produto","#6366F1"],["Próximo do vencimento","Prox_Vencimento","#EAB308"],["Sem saldo / furo","Sem_Saldo","#EF4444"],["Avaria","Avaria","#F97316"]].map(([l,k,c])=>({l,v:rows.filter(r=>pbool(r[k])).length,c}));
+  const valRua={};rows.forEach(r=>{if(!pbool(r.Possui_NC))return;const k=unz(r.Rua);valRua[k]=(valRua[k]||0)+pnum(r.Valor_Divergencia);});
+  const dias=porDia(Object.values(pr).flat().map(c=>({ts:c.ts,q:c.q})),d=>{const m=d.rows.reduce((a,x)=>a+x.q,0)/d.rows.length;return {l:fxDia(d.ts),v:m,txt:pc0(m),c:FXC[fxCls(m)]};});
+  return fxHead(tit,rows.length)+
+    fxKpis([{t:"Auditorias",v:nCiclos},{t:"Qualidade média",v:pc1(qm),c:qm==null?"#64748B":FXC[fxCls(qm)]},{t:"Ocorrências",v:ocorr,c:"#DC2626"},
+      {t:"Ruas auditadas",v:Object.keys(ult).length,c:"#0F172A",s:"de "+totRuas+" possíveis"},{t:"Ruas críticas <85%",v:crit.length,c:"#DC2626",s:"requer ação",sc:"#DC2626"},{t:"Valor em divergência",v:BRL0(val),c:"#B45309"}])+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Mapa de qualidade por bloco",fxMapa(qRua))+
+      '<div class="fx-g2">'+fxCard("Ocorrências por tipo",fxDonut(tipos))+fxCard("Evolução da qualidade (por dia)",fxCols(dias))+'</div></div>'+
+    '<div class="fx-col">'+fxCard("Ruas críticas (&lt;85%)",fxChips(crit.map(([r,c])=>[r,c.q,blocoDe(r)])))+
+      fxCard("Repositores — acuracidade",fxBars(reps.map(x=>({l:x.q.mat+" - "+curto(nomeC(x.q.mat)),v:x.acc,txt:pc1(x.acc),c:FXC[fxCls(x.acc)]})),{max:1}))+
+      fxCard("Auditores — ruas inspecionadas",fxBars(Object.entries(aud).sort((a,b)=>b[1].size-a[1].size).map(([n,s])=>({l:n,v:s.size,txt:s.size+" rua"+(s.size>1?"s":""),c:"#3B82F6"}))))+
+      fxCard("Maiores divergências por rua (R$)",fxBars(Object.entries(valRua).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([r,v])=>({l:"Rua "+r,v,txt:BRL0(v),c:"#B45309"}))))+'</div></div>'+fxFoot("Qualidade de Ruas");}
+
+/* ---- Retorno ---- */
+function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).map(r=>Object.assign(r,{_nc:pbool(r.Possui_NC),_rua:unz(r.Rua),_qe:pnum(r.Qtd_Etiqueta),_qf:pnum(r.Qtd_Fisico),_vt:pnum(r.Valor_Total),_vd:pnum(r.Valor_Divergencia),_du:pnum(r.Divergencia_Un)})),tit="Auditoria de Retorno — Fechamento";
+  const conf=rows.filter(r=>!r._nc).length,q=rows.length?conf/rows.length:null,vt=rows.reduce((a,r)=>a+r._vt,0),vd=rows.reduce((a,r)=>a+r._vd,0),venc=rows.filter(r=>pbool(r.Prox_Vencimento)).length;
+  const porRua={};rows.forEach(r=>{const x=porRua[r._rua]=porRua[r._rua]||{n:0,c:0,vd:0,vt:0};x.n++;if(!r._nc)x.c++;x.vd+=r._vd;x.vt+=r._vt;});
+  const qRua={};Object.entries(porRua).forEach(([r,x])=>qRua[r]=x.c/x.n);
+  const crit=Object.entries(qRua).filter(([r,v])=>v<.85).sort((a,b)=>a[1]-b[1]);
+  const reps=QUADRO.filter(x=>x.ruas.length).map(x=>{let n=0,c=0;x.ruas.forEach(r=>{if(porRua[r]){n+=porRua[r].n;c+=porRua[r].c;}});return {x,n,acc:n?c/n:null};}).filter(o=>o.acc!=null).sort((a,b)=>b.acc-a.acc||b.n-a.n);
+  const aud={};rows.forEach(r=>{const k=r.Nome_Auditor||r.Matricula_Auditor||"—";aud[k]=(aud[k]||0)+1;});
+  const div=rows.filter(r=>r._du!==0).length,manual=rows.filter(r=>r._nc&&r._du===0&&!pbool(r.Prox_Vencimento)).length;
+  const top=rows.filter(r=>r._vd).sort((a,b)=>Math.abs(b._vd)-Math.abs(a._vd)).slice(0,8);
+  const dias=porDia(rows,d=>{const c=d.rows.filter(r=>!r._nc).length/d.rows.length;return {l:fxDia(d.ts),v:c,txt:pc0(c),c:FXC[fxCls(c)]};});
+  return fxHead(tit,rows.length)+
+    fxKpis([{t:"Itens auditados",v:rows.length},{t:"Conformidade",v:pc1(q),c:q==null?"#64748B":FXC[fxCls(q)]},{t:"Não conformidades",v:rows.length-conf,c:"#DC2626"},
+      {t:"Ruas com retorno",v:Object.keys(porRua).length,c:"#0F172A",s:crit.length+" abaixo de 85%",sc:crit.length?"#DC2626":"#64748B"},{t:"Valor do retorno",v:BRL0(vt),c:"#0F172A",s:"quantidade física"},
+      {t:"Valor da divergência",v:BRL0(vd),c:vd<0?"#DC2626":vd>0?"#B45309":"#16A34A",s:venc+" ite"+(venc===1?"m":"ns")+" vencendo"}])+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Conformidade do retorno por bloco",fxMapa(qRua,"Percentual = itens conformes ÷ itens auditados na rua."))+
+      '<div class="fx-g2">'+fxCard("Ocorrências",fxDonut([{l:"Divergência de quantidade",v:div,c:"#EF4444"},{l:"Próximo do vencimento",v:venc,c:"#EAB308"},{l:"Retorno não conforme",v:manual,c:"#6366F1"},{l:"Conforme",v:conf,c:"#16A34A"}]))+
+      fxCard("Conformidade por dia",fxCols(dias))+'</div></div>'+
+    '<div class="fx-col">'+fxCard("Ruas críticas (&lt;85%)",fxChips(crit.map(([r,v])=>[r,v,blocoDe(r)])))+
+      fxCard("Repositores — acuracidade do retorno",fxBars(reps.map(o=>({l:o.x.mat+" - "+curto(nomeC(o.x.mat))+" ("+o.n+")",v:o.acc,txt:pc1(o.acc),c:FXC[fxCls(o.acc)]})),{max:1}))+
+      fxCard("Auditores — itens auditados",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:n,v,txt:v+" ite"+(v===1?"m":"ns"),c:"#3B82F6"}))))+
+      fxCard("Maiores divergências",fxTable([{t:"Rua"},{t:"Item"},{t:"Etiq.",n:1},{t:"Fís.",n:1},{t:"Valor",n:1}],top.map(r=>[esc(r._rua),esc(r.Produto+" – "+String(r.Descricao_Produto||"").slice(0,28)),r._qe,r._qf,'<b style="color:'+(r._vd<0?"#DC2626":"#B45309")+'">'+BRL0(r._vd)+'</b>'])))+'</div></div>'+fxFoot("Auditoria de Retorno");}
+
+/* ---- Cargas ---- */
+function fxCar(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.cargas).map(r=>Object.assign(r,{_q:pnum(r.Quantidade),_v:pnum(r.Valor_Total)})),tit="Auditoria de Cargas — Fechamento";
+  const MOT=[["Falta","#EF4444"],["Avaria","#F97316"],["Abastecimento","#6366F1"],["Sobras","#CA8A04"]];
+  const m={};MOT.forEach(([k])=>m[k]={n:0,q:0,v:0});rows.forEach(r=>{const x=m[r.Motivo];if(x){x.n++;x.q+=r._q;x.v+=r._v;}});
+  const oss=new Set(rows.map(r=>r.Numero_OS)),tot=rows.reduce((a,r)=>a+r._v,0),un=rows.reduce((a,r)=>a+r._q,0);
+  const cau={};rows.forEach(r=>{const k=(r.Causador||"Não informado")+"|"+(r.Nome_Causador||"");const x=cau[k]=cau[k]||{t:r.Causador||"Não informado",n:r.Nome_Causador||"",i:0,v:0};x.i++;x.v+=r._v;});
+  const conf={};rows.forEach(r=>{const k=r.Nome_Conferente||"—";const x=conf[k]=conf[k]||{i:0,os:new Set()};x.i++;x.os.add(r.Numero_OS);});
+  const box={};rows.forEach(r=>{const k=String(r.Box||"—");box[k]=(box[k]||0)+r._v;});
+  const aud={};rows.forEach(r=>{const k=r.Nome_Auditor||"—";(aud[k]=aud[k]||new Set()).add(r.Numero_OS);});
+  const osT={};rows.forEach(r=>{const k=r.Numero_OS;const x=osT[k]=osT[k]||{box:r.Box,conf:r.Nome_Conferente,i:0,v:0,mot:{}};x.i++;x.v+=r._v;x.mot[r.Motivo]=1;});
+  const dias=porDia(rows,d=>{const v=d.rows.reduce((a,r)=>a+r._v,0);return {l:fxDia(d.ts),v,txt:BRL0(v).replace(/,\d\d$/,""),c:"#2563EB"};});
+  return fxHead(tit,rows.length)+
+    fxKpis([{t:"O.S. auditadas",v:oss.size},{t:"Itens com ocorrência",v:rows.length,c:"#DC2626"},{t:"Unidades",v:un,c:"#0F172A"},{t:"Valor total",v:BRL0(tot),c:"#B45309"},
+      {t:"Faltas",v:BRL0(m.Falta.v),c:"#DC2626",s:m.Falta.q+" un"},{t:"Sobras",v:BRL0(m.Sobras.v),c:"#CA8A04",s:m.Sobras.q+" un"}])+
+    '<div class="fx-g"><div class="fx-col">'+
+      '<div class="fx-g2">'+fxCard("Ocorrências por motivo",fxDonut(MOT.map(([k,c])=>({l:k,v:m[k].n,c}))))+fxCard("Valor por motivo",fxBars(MOT.map(([k,c])=>({l:k+" ("+m[k].q+" un)",v:m[k].v,txt:BRL0(m[k].v),c})).filter(x=>x.v>0)))+'</div>'+
+      fxCard("Valor das ocorrências por dia",fxCols(dias))+
+      fxCard("O.S. com maior valor",fxTable([{t:"O.S."},{t:"Box"},{t:"Conferente"},{t:"Motivos"},{t:"Itens",n:1},{t:"Valor",n:1}],Object.entries(osT).sort((a,b)=>b[1].v-a[1].v).slice(0,8).map(([k,x])=>[esc(k),esc(x.box),esc(curto(x.conf||"")),esc(Object.keys(x.mot).join(", ")),x.i,'<b>'+BRL0(x.v)+'</b>'])))+'</div>'+
+    '<div class="fx-col">'+fxCard("Causadores — valor das ocorrências",fxBars(Object.values(cau).sort((a,b)=>b.v-a.v).slice(0,10).map(x=>({l:x.t+(x.n?" · "+curto(x.n):"")+" ("+x.i+")",v:x.v,txt:BRL0(x.v),c:x.t==="Separador"?"#7C3AED":x.t==="Conferente"?"#0EA5E9":"#94A3B8"}))))+
+      fxCard("Conferentes — ocorrências",fxBars(Object.entries(conf).sort((a,b)=>b[1].i-a[1].i).slice(0,10).map(([n,x])=>({l:curto(n)+" ("+x.os.size+" O.S.)",v:x.i,txt:x.i+" ite"+(x.i===1?"m":"ns"),c:"#0EA5E9"}))))+
+      fxCard("Valor por box",fxBars(Object.entries(box).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({l:"Box "+k,v,txt:BRL0(v),c:"#2563EB"}))))+
+      fxCard("Auditores — O.S. auditadas",fxBars(Object.entries(aud).sort((a,b)=>b[1].size-a[1].size).map(([n,s])=>({l:n,v:s.size,txt:s.size+" O.S.",c:"#3B82F6"}))))+'</div></div>'+fxFoot("Auditoria de Cargas");}
+
+/* ---- tela ---- */
+const FX_TIT={ruas:"Qualidade de Ruas",retorno:"Auditoria de Retorno",cargas:"Auditoria de Cargas"};
+function fxRelatorio(){return FECH.tipo==="retorno"?fxRet():FECH.tipo==="cargas"?fxCar():fxRuas();}
+function renderFech(){const box=$("fech");if(!box)return;
+  const bar='<div class="fxbar"><div class="seg fx-tabs" role="group" aria-label="Tipo de auditoria">'+["ruas","retorno","cargas"].map(k=>'<button type="button" data-fx="'+k+'" aria-pressed="'+(FECH.tipo===k)+'">'+FX_TIT[k].replace("Auditoria de ","").replace("Qualidade de ","")+'</button>').join("")+'</div>'+
+    '<label>De <input class="in" type="date" id="fx-de" value="'+FECH.de+'"></label><label>Até <input class="in" type="date" id="fx-ate" value="'+FECH.ate+'"></label>'+
+    '<button type="button" class="btn" id="fx-upd">Atualizar</button><button type="button" class="save" id="fx-pr" style="margin:0;min-height:44px;font-size:1.1rem;width:auto;padding:0 18px">Imprimir / PDF</button></div>'+
+    '<p class="note" id="fx-info" style="margin:0 0 10px">'+esc(FECH.info||"")+'</p>';
+  if(!FECH.dados){box.innerHTML=bar+'<div class="empty">'+(FECH.busy?"Carregando a planilha…":"Toque em Atualizar para carregar os dados da planilha.")+'</div>';bindFech();return;}
+  box.innerHTML=bar+'<div class="fxwrap"><div class="pd fx" id="fx-rel">'+fxRelatorio()+'</div></div>';bindFech();}
+function bindFech(){document.querySelectorAll("[data-fx]").forEach(b=>b.onclick=()=>{FECH.tipo=b.dataset.fx;renderFech();});
+  $("fx-de").onchange=e=>{FECH.de=e.target.value;if(FECH.ate&&FECH.ate<FECH.de)FECH.ate=FECH.de;renderFech();};
+  $("fx-ate").onchange=e=>{FECH.ate=e.target.value;renderFech();};
+  $("fx-upd").onclick=()=>carregarFech(true);
+  $("fx-pr").onclick=()=>{if(!FECH.dados){toast("Carregue os dados primeiro.");return;}const tit=FX_TIT[FECH.tipo];
+    openDoc({html:'<div class="pd fx">'+fxRelatorio()+'</div>',multi:false,land:true,name:"Fechamento_"+tit.replace(/\s+/g,"_")+"_"+FECH.de+"_a_"+FECH.ate+".pdf",title:"Fechamento – "+tit,
+      short:"Fechamento – "+tit+" – "+fdISO(FECH.de)+" a "+fdISO(FECH.ate),text:"*FECHAMENTO – "+tit.toUpperCase()+"*\nPeríodo: "+fdISO(FECH.de)+" a "+fdISO(FECH.ate)});};}
+async function carregarFech(manual){if(FECH.busy)return;
+  if(DEMO||!SHEET_URL){FECH.info="O fechamento lê a planilha pelo site, com login de administrador.";renderFech();return;}
+  if(!navigator.onLine){FECH.info=FECH.dados?"Sem internet: mostrando a última cópia da planilha.":"Sem internet.";renderFech();return;}
+  FECH.busy=true;if(!FECH.dados)renderFech();const inf=$("fx-info");if(inf)inf.textContent="Atualizando com a planilha…";
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=fechamento&token="+encodeURIComponent((LOGIN&&LOGIN.token)||"")+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+    if(j&&j.ok&&j.ruas){FECH.dados=j;aplicarQuadroPlanilha(j.quadro);FECH.info="Planilha Google · atualizado "+fmtDT(new Date()).slice(0,16)+" · Ruas "+((j.ruas.registros||[]).length)+" · Retorno "+((j.retorno&&j.retorno.registros||[]).length)+" · Cargas "+((j.cargas&&j.cargas.registros||[]).length)+" lançamentos";
+      IDB.set("fech_cache",{dados:j,info:FECH.info}).catch(()=>{});if(manual)toast("Fechamento atualizado.");}
+    else FECH.info=(j&&j.erro)||"Atualize o Apps Script para a versão 11 para usar o fechamento.";
+  }catch(e){FECH.info=FECH.dados?"Sem conexão com a planilha: mostrando a última cópia.":"Sem conexão com a planilha.";}
+  FECH.busy=false;renderFech();}
+IDB.get("fech_cache").then(c=>{if(c&&c.dados&&!FECH.dados){FECH.dados=c.dados;FECH.info="Última cópia da planilha: "+String(c.info||"").replace(/^Planilha Google · atualizado /,"");}}).catch(()=>{});
 
 // auditoria de retorno (por rua, vários lançamentos)
 let SR=store.get("audcd_sessao_ret",null);
@@ -1057,19 +1196,20 @@ const waURLt=t=>"https://wa.me/"+WA_NUM+"?text="+encodeURIComponent(t);
 const H2C="lib/html2canvas.min.js";
 const JSPDF="lib/jspdf.umd.min.js";
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>{s.remove();rej(new Error("load"));};document.head.appendChild(s);});}
-async function makePdf(html,multi){
+async function makePdf(html,multi,land){
   if(!window.html2canvas)await loadScript(H2C);if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(JSPDF);
-  const host=document.createElement("div");host.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:34px 45px;box-sizing:border-box";
+  const PW=land?297:210,PH=land?210:297;
+  const host=document.createElement("div");host.style.cssText="position:fixed;left:-10000px;top:0;width:"+(land?1123:794)+"px;background:#fff;padding:"+(land?"0":"34px 45px")+";box-sizing:border-box";
   host.innerHTML=html;document.body.appendChild(host);
   await Promise.all([...host.querySelectorAll("img")].map(i=>i.complete?0:new Promise(ok=>{i.onload=i.onerror=ok;})));
   try{
-    const cv=await window.html2canvas(host,{scale:2,backgroundColor:"#ffffff",logging:false});
-    const pdf=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:"portrait"});
-    const pageH=Math.floor(cv.width*297/210);
-    if(!multi||cv.height<=pageH){let w=210,h=cv.height*w/cv.width;if(h>297){h=297;w=cv.width*h/cv.height;}pdf.addImage(cv.toDataURL("image/jpeg",.9),"JPEG",(210-w)/2,0,w,h);}
+    const cv=await window.html2canvas(host,{scale:2,backgroundColor:"#ffffff",logging:false,windowWidth:land?1200:900});
+    const pdf=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:land?"landscape":"portrait"});
+    const pageH=Math.floor(cv.width*PH/PW);
+    if(!multi||cv.height<=pageH){let w=PW,h=cv.height*w/cv.width;if(h>PH){h=PH;w=cv.width*h/cv.height;}pdf.addImage(cv.toDataURL("image/jpeg",.92),"JPEG",(PW-w)/2,0,w,h);}
     else{const pc=document.createElement("canvas");pc.width=cv.width;const ctx=pc.getContext("2d");let y=0,first=true;
       while(y<cv.height){const h=Math.min(pageH,cv.height-y);pc.height=h;ctx.fillStyle="#fff";ctx.fillRect(0,0,pc.width,h);ctx.drawImage(cv,0,y,cv.width,h,0,0,cv.width,h);
-        if(!first)pdf.addPage();pdf.addImage(pc.toDataURL("image/jpeg",.9),"JPEG",0,0,210,h*210/cv.width);first=false;y+=pageH-60;}}
+        if(!first)pdf.addPage();pdf.addImage(pc.toDataURL("image/jpeg",.92),"JPEG",0,0,PW,h*PW/cv.width);first=false;y+=pageH-60;}}
     return pdf.output("blob");
   }finally{host.remove();}
 }
@@ -1085,7 +1225,7 @@ let CUR=null;
 async function sendWA(btn){const D=CUR;if(!D)return;
   if(!navigator.onLine){toast("Sem internet agora. Use Baixar PDF e envie quando a conexão voltar.");return;}
   const old=btn.textContent;btn.disabled=true;btn.textContent="Gerando PDF…";
-  try{const blob=await makePdf(D.html,D.multi),file=new File([blob],D.name,{type:"application/pdf"});
+  try{const blob=await makePdf(D.html,D.multi,D.land),file=new File([blob],D.name,{type:"application/pdf"});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       try{await navigator.share({files:[file],title:D.title,text:D.short});toast("Escolha WhatsApp e o contato (61) 98617-0228.");return;}
       catch(e){if(e&&e.name==="AbortError")return;}}
@@ -1095,13 +1235,15 @@ async function sendWA(btn){const D=CUR;if(!D)return;
 }
 function openDoc(D){CUR=D;const p=$("print");
   p.innerHTML='<div class="pv-bar"><button type="button" id="pv-x">'+(D.closeLabel||"Fechar")+'</button><button type="button" class="main" id="pv-p">Imprimir</button><button type="button" id="pv-dl">Baixar PDF</button><button type="button" class="wa" id="pv-wa">Enviar PDF no WhatsApp</button></div>'+D.html;
-  p.hidden=false;p.scrollTop=0;
+  p.classList.toggle("land",!!D.land);p.hidden=false;p.scrollTop=0;
   const pd=p.querySelector(".pd");
-  if(D.multi)document.documentElement.style.setProperty("--fit",1);else fitWhenReady(pd);
-  $("pv-x").onclick=()=>{p.hidden=true;p.innerHTML="";CUR=null;D.onClose&&D.onClose();};
-  $("pv-p").onclick=()=>{try{if(!D.multi)window.stFit(pd);window.print();}catch(e){toast("Impressão bloqueada aqui. Use Baixar PDF.");}};
+  let pg=$("pg-land");if(D.land){if(!pg){pg=document.createElement("style");pg.id="pg-land";pg.textContent="@page{size:A4 landscape;margin:0}";document.head.appendChild(pg);}}else if(pg)pg.remove();
+  const fitLand=()=>{const h=pd.scrollHeight||1;document.documentElement.style.setProperty("--fit",Math.min(1,Math.floor(780/h*100)/100));};
+  if(D.land&&!D.multi)setTimeout(fitLand,60);else if(D.multi)document.documentElement.style.setProperty("--fit",1);else fitWhenReady(pd);
+  $("pv-x").onclick=()=>{p.hidden=true;p.innerHTML="";CUR=null;const g=$("pg-land");if(g)g.remove();p.classList.remove("land");D.onClose&&D.onClose();};
+  $("pv-p").onclick=()=>{try{if(D.land&&!D.multi)fitLand();else if(!D.multi)window.stFit(pd);window.print();}catch(e){toast("Impressão bloqueada aqui. Use Baixar PDF.");}};
   $("pv-dl").onclick=async()=>{const bt=$("pv-dl");bt.disabled=true;bt.textContent="Gerando PDF…";
-    try{const blob=await makePdf(D.html,D.multi);if(await saveBlob(blob,D.name))toast("PDF salvo: "+D.name);}
+    try{const blob=await makePdf(D.html,D.multi,D.land);if(await saveBlob(blob,D.name))toast("PDF salvo: "+D.name);}
     catch(e){toast("Não foi possível gerar o PDF. Tente novamente.");}
     finally{bt.disabled=false;bt.textContent="Baixar PDF";}};
   $("pv-wa").onclick=()=>sendWA($("pv-wa"));

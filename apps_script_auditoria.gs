@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 10)
+ * Auditoria STA – Santa Therezinha (versão 11)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -104,12 +104,27 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     const ss = abrirPlanilha();
     if (p.acao === 'sessao') return resposta(validarToken(p.token));
+    if (p.acao === 'fechamento') {
+      const s = validarToken(p.token);
+      if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
+      if (s.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'O fechamento é só para administradores (aud_adm).' });
+      return resposta({
+        ok: true,
+        ruas: lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
+          'Sem_Saldo', 'Avaria', 'Possui_NC', 'Qtd_Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em']),
+        retorno: lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
+          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em']),
+        cargas: lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
+          'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
+        quadro: lerQuadro(ss)
+      });
+    }
     if (p.acao === 'registros') {
       const s = validarToken(p.token);
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 10, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 11, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -331,7 +346,27 @@ function resposta(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/* ===================== Painel ===================== */
+/* ===================== Painel e fechamento ===================== */
+
+/** Lê colunas escolhidas de uma aba (sem fotos). */
+function lerAba(ss, nome, campos) {
+  const sh = ss.getSheetByName(nome);
+  if (!sh || sh.getLastRow() < 2) return { colunas: campos, registros: [] };
+  const dados = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  const cab = dados[0].map(String);
+  const idx = campos.map(function (c) { return cab.indexOf(c); });
+  const regs = [];
+  for (let i = 1; i < dados.length; i++) {
+    const l = dados[i];
+    if (idx[0] < 0 || !l[idx[0]]) continue;
+    regs.push(idx.map(function (k) {
+      if (k < 0) return '';
+      const v = l[k];
+      return v instanceof Date ? Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm:ss') : v;
+    }));
+  }
+  return { colunas: campos, registros: regs };
+}
 
 function listarRegistros(ss) {
   const campos = ['ID_Auditoria', 'DataHora', 'Nome_Auditor', 'Endereco', 'Rua', 'Possui_NC', 'Erro_Produto',
