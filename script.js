@@ -821,8 +821,8 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
     if(idx==null||idx<0)idx=rot.findIndex((o,i)=>!usados.has(i)&&o.cod===a._cod);
     if(idx>=0){usados.add(idx);a._rot=rot[idx];}
     a._dif=a._qf-a._qe;a._ok=Math.abs(a._dif)<=marg;});
-  const ruas={};const R=k=>ruas[k]=ruas[k]||{os:0,aud:0,ok:0,qe:0,qf:0,cob:0};
-  rot.forEach(o=>R(o.rua).os++);aud.forEach(a=>{const k=a._rot?a._rot.rua:a._rua;const x=R(k);x.aud++;if(a._ok)x.ok++;x.qe+=a._qe;x.qf+=a._qf;if(a._rot)x.cob++;});
+  const ruas={};const R=k=>ruas[k]=ruas[k]||{os:0,aud:0,ok:0,qe:0,qf:0,cob:0,qr:0};
+  rot.forEach(o=>{const x=R(o.rua);x.os++;x.qr+=o.qtd||0;});aud.forEach(a=>{const k=a._rot?a._rot.rua:a._rua;const x=R(k);x.aud++;if(a._ok)x.ok++;x.qe+=a._qe;x.qf+=a._qf;if(a._rot)x.cob++;});
   Object.keys(ruas).forEach(k=>{if(RUAS_FORA.has(k))delete ruas[k];});const qRua={};Object.entries(ruas).forEach(([k,x])=>{if(x.aud)qRua[k]=x.ok/x.aud;});
   const ruaDe=a=>a._rot?a._rot.rua:a._rua;
   const repNomes=r=>repsDaRua(r).map(m=>curto(nomeC(m))).join(" e ")||"—";
@@ -833,16 +833,18 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
   const nAud=aud.length,nOk=aud.filter(a=>a._ok).length,nMatch=aud.filter(a=>a._rot).length,q=nAud?nOk/nAud:null,cob=rot.length?nMatch/rot.length:null;
   const fora=aud.filter(a=>!a._ok).sort((a,b)=>Math.abs(b._dif)-Math.abs(a._dif)).slice(0,10);
   const audT={};aud.forEach(a=>{const k=a.Nome_Auditor||"—";audT[k]=(audT[k]||0)+1;});
-  const repsL=Object.values(reps);
+  const repsL=Object.values(reps);const totQr=Object.values(ruas).reduce((a,x)=>a+x.qr,0),totQf=Object.values(ruas).reduce((a,x)=>a+x.qf,0),pQ=totQr?totQf/totQr:null;
   return fxHead(tit,nAud)+
     fxKpis([{t:"OS na rotina",v:rot.length,c:"#0F172A",s:"retornos lançados no período"},{t:"Retornos auditados",v:nAud},{t:"Cobertura",v:pc1(cob),c:"#0E7490",s:nMatch+" OS encontradas na rotina"},
-      {t:"Dentro da margem (±"+marg+")",v:pc1(q),c:q==null?"#64748B":FXC[fxCls(q)],s:nOk+" de "+nAud+" auditorias"},{t:"Fora da margem",v:nAud-nOk,c:"#DC2626"},
+      {t:"Dentro da margem (±"+marg+")",v:pc1(q),c:q==null?"#64748B":FXC[fxCls(q)],s:nOk+" de "+nAud+" auditorias"},{t:"Qtd. retornada × auditada",v:totQf.toLocaleString("pt-BR")+" / "+totQr.toLocaleString("pt-BR"),c:"#0F172A",s:(pQ==null?"—":pc1(pQ))+" das unidades auditadas · "+(nAud-nOk)+" fora da margem",sc:"#64748B"},
       {t:"Repositores avaliados",v:repsL.filter(x=>x.aud).length,c:"#0F172A",s:"de "+repsL.length+" no quadro"}])+
     '<div class="fx-g"><div class="fx-col">'+fxCard("Qualidade do retorno por rua (margem ±"+marg+" un)",fxMapa(qRua,"Qualidade = auditorias com |contagem − etiqueta| ≤ "+marg+" ÷ auditorias da rua. Rua pela coluna RUA_O da rotina; repositor pelo quadro de repositores."))+
-      fxCard("Retornos por rua",(function(){const H=[{t:"Rua"},{t:"O.S.",n:1},{t:"Auditados",n:1},{t:"Qualidade",n:1}];
-        const L=Object.entries(ruas).filter(([k])=>k).sort((a,b)=>(+a[0])-(+b[0])).map(([k,x])=>['<b>'+esc(k)+'</b>',x.os,x.aud,x.aud?'<b style="color:'+FXC[fxCls(x.ok/x.aud)]+'">'+pc0(x.ok/x.aud)+'</b>':'—']);
+      fxCard("Retornos por rua — quantidade retornada × auditada",(function(){const H=[{t:"Rua"},{t:"O.S.",n:1},{t:"Aud.",n:1},{t:"Qtd. ret.",n:1},{t:"Qtd. aud.",n:1},{t:"Qual.",n:1}];
+        const L=Object.entries(ruas).filter(([k])=>k).sort((a,b)=>(+a[0])-(+b[0])).map(([k,x])=>['<b>'+esc(k)+'</b>',x.os,x.aud,x.qr.toLocaleString("pt-BR"),x.qf.toLocaleString("pt-BR"),x.aud?'<b style="color:'+FXC[fxCls(x.ok/x.aud)]+'">'+pc0(x.ok/x.aud)+'</b>':'—']);
         if(L.length<=10)return '<div class="fx-cmp">'+fxTable(H,L)+'</div>';const n=Math.ceil(L.length/3);return '<div class="fx-g3 fx-cmp">'+[0,1,2].map(i=>L.slice(i*n,(i+1)*n)).filter(x=>x.length).map(x=>fxTable(H,x)).join("")+'</div>';})())+'</div>'+
     '<div class="fx-col">'+fxCard("Repositores — qualidade do retorno",fxBars(repsL.filter(x=>x.aud).sort((a,b)=>b.ok/b.aud-a.ok/a.aud||b.aud-a.aud).map(x=>({l:curto(x.n)+" · ruas "+[...x.ruas].sort((a,b)=>a-b).join(",")+" ("+x.aud+"/"+x.os+" OS)",v:x.ok/x.aud,txt:pc1(x.ok/x.aud),c:FXC[fxCls(x.ok/x.aud)]})),{max:1}))+
+      fxCard("Quantidade retornada × auditada (unidades)",(function(){const L=Object.entries(ruas).filter(([k,x])=>k&&(x.qr||x.qf)).sort((a,b)=>b[1].qr-a[1].qr).slice(0,10);if(!L.length)return '<p class="fx-e">Sem dados no período.</p>';const mx=Math.max(...L.map(([k,x])=>Math.max(x.qr,x.qf)),1);
+        return '<div class="fx-bars">'+L.map(([k,x])=>'<div class="fx-br fx-br2"><span class="n"></span><span class="l">Rua '+esc(k)+'</span><span><span class="t"><i style="width:'+Math.max(1,Math.round(x.qr/mx*100))+'%;background:#94A3B8"></i></span><span class="t" style="margin-top:2px"><i style="width:'+Math.max(x.qf?1:0,Math.round(x.qf/mx*100))+'%;background:#2563EB"></i></span></span><b>'+x.qf.toLocaleString("pt-BR")+' / '+x.qr.toLocaleString("pt-BR")+'</b></div>').join("")+'</div><p class="fx-e" style="margin-top:6px"><i style="display:inline-block;width:10px;height:8px;background:#94A3B8;border-radius:2px"></i> retornado na rotina &nbsp; <i style="display:inline-block;width:10px;height:8px;background:#2563EB;border-radius:2px"></i> contado na auditoria</p>';})())+
       fxCard("Repositores sem retorno auditado no período",(function(){const L=repsL.filter(x=>!x.aud).sort((a,b)=>b.os-a.os);return L.length?'<div class="fx-chips">'+L.map(x=>'<span class="s-na">'+esc(curto(x.n))+' · ruas '+[...x.ruas].sort((a,b)=>a-b).join(",")+' · '+x.os+' OS</span>').join("")+'</div>':'<p class="fx-e">Todos os repositores tiveram retorno auditado.</p>';})())+
       fxCard("Auditorias fora da margem",fxTable([{t:"Rua"},{t:"OS"},{t:"Item"},{t:"Repositor"},{t:"Etiq.",n:1},{t:"Cont.",n:1},{t:"Dif.",n:1}],
         fora.map(a=>[esc(ruaDe(a)),esc(a._rot?a._rot.os:(a._os||"—")),esc(a._cod),esc(repNomes(ruaDe(a))),a._qe,a._qf,'<b style="color:#DC2626">'+(a._dif>0?"+":"")+a._dif+'</b>'])))+
