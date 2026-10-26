@@ -43,7 +43,7 @@
       <div id="r-nc" hidden>
         <div class="field" id="r-rep-f"><label>Repositor da rua auditada</label><div id="r-rep"></div><div class="hint">A ocorrência fica registrada para este colaborador.</div></div>
 
-        <div class="field" id="r-qtd-f"><label for="r-qtd">Unidades encontradas</label>
+        <div class="field" id="r-qtd-f"><label for="r-qtd">Quantidade encontrada</label>
           <div class="stepper"><button type="button" data-step="-1" aria-label="Diminuir">−</button><input class="in" id="r-qtd" type="number" inputmode="numeric" min="0" step="1" value="0"><button type="button" data-step="1" aria-label="Aumentar">+</button></div>
           <div class="hint" id="r-qtd-h"></div></div>
         <div class="money" id="r-money"><span>Valor real da divergência<br><small id="r-money-calc">0 un × R$ 0,00</small></span><b id="r-valor">R$ 0,00</b></div>
@@ -91,6 +91,7 @@
     <div id="pend-box"></div>
     <div id="list"></div>
     <div class="export">
+      <button type="button" class="save" id="x-nc" hidden style="margin:0 0 4px">Imprimir todas as NCs da planilha (ADM)</button>
       <button type="button" class="btn full" id="x-ruas">Baixar CSV</button>
       <p class="note">O CSV respeita o período e o filtro acima, com as mesmas colunas da planilha. No Google Planilhas: Arquivo → Importar → Anexar à planilha atual, separador ponto e vírgula.</p>
       <div id="copy-area"></div>
@@ -106,7 +107,7 @@
       <div class="field" id="t-os-f"><label for="t-os">Número da O.S. <small style="font-weight:400;color:var(--muted)">(opcional)</small></label><input class="in" id="t-os" inputmode="numeric" placeholder="Ex.: 13305193"><div class="hint" id="t-rot">Com a rotina 8457 importada, o repositor responsável é puxado pela O.S. ou pelo item + rua.</div></div>
     </div>
     <div class="block">
-      <h3>Quantidades <small>em unidades</small></h3>
+      <h3>Quantidades <small>caixas + unidades</small></h3>
       <div class="row2q">
         <div class="field" id="t-qe-f"><label for="t-qe">Qtd. na etiqueta</label><div class="stepper"><button type="button" data-q="t-qe" data-s="-1" aria-label="Diminuir">−</button><input class="in" id="t-qe" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-q="t-qe" data-s="1" aria-label="Aumentar">+</button></div></div>
         <div class="field" id="t-qf-f"><label for="t-qf">Qtd. física (contada)</label><div class="stepper"><button type="button" data-q="t-qf" data-s="-1" aria-label="Diminuir">−</button><input class="in" id="t-qf" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-q="t-qf" data-s="1" aria-label="Aumentar">+</button></div></div>

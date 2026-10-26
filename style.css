@@ -358,3 +358,12 @@ nav button.desk{display:none}
 .pk-list li.pk-new{background:var(--brand-soft)}
 .pk-list li.pk-new .t{color:var(--brand)}
 #nc-sheet{z-index:45}
+.cxun-r{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cxun .cxl{display:block;font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:4px}
+.cxun .stepper button{width:40px}
+.cxun .stepper .in{font-size:1.15rem;min-height:46px}
+.cxun-t{font-size:.84rem;color:var(--muted);margin-top:6px}
+.cxun-t b{color:var(--ink)}.cxun-t .cxun-tot{color:var(--brand)}
+.cxun.semcx [data-w="cx"]{opacity:.45}
+#r-cx-hint,#t-cx-h,#g-cx-h{display:none}
+.row2q{grid-template-columns:1fr!important}

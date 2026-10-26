@@ -117,7 +117,7 @@ const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car",admin:"aud_ad
 const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
 const podeVer=v=>!VIEW_PERM[v]||temPerm(VIEW_PERM[v]);
 function primeiraTela(){return ["ruas","retorno","cargas"].find(podeVer)||"registros";}
-function aplicarPerms(){let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok&&!(b.classList.contains("desk")&&innerWidth<900))n++;});
+function aplicarPerms(){try{paintXnc();}catch(e){}let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok&&!(b.classList.contains("desk")&&innerWidth<900))n++;});
   document.querySelector("nav").style.setProperty("--nav-n",n);document.querySelector("nav").dataset.n=n;
   const fa=$("f-aba");if(fa){[...fa.options].forEach(o=>o.hidden=!podeVer(o.value));if(!podeVer(fa.value)){const o=[...fa.options].find(x=>podeVer(x.value));if(o)fa.value=o.value;}}}
 async function sha256(s){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");}catch(e){return "";}}
@@ -204,7 +204,7 @@ document.querySelectorAll(".tg[data-k]").forEach(b=>b.addEventListener("click",(
 const anyNC=()=>{const f=R.flags;return f.erro||f.venc||f.saldo||f.avaria;};
 const picking=()=>R.prod==null?null:(eByProd.has(P.cod[R.prod])?eByProd.get(P.cod[R.prod]):null);
 function auditedAddr(){if(R.flags.erro)return R.addr;return R.addrManual?R.addr:picking();}
-function paint(){
+function paint(){if(window.QW&&QW.r)QW.r.refresh();
   const pi=R.prod,pk=picking(),el=$("r-rack");
   if(pi==null){el.innerHTML="";}
   else{
@@ -242,7 +242,7 @@ paint();
 function reset(){
   rProd.clear();rAddr.clear();rRep.clear();rEnd.clear();if(S&&cIdx.has(S.rep))rRep.set(cIdx.get(S.rep));R.prod=null;R.addr=null;R.addrManual=false;R.fotos=[];
   Object.keys(R.flags).forEach(k=>R.flags[k]=false);document.querySelectorAll(".tg[data-k]").forEach(b=>b.setAttribute("aria-pressed","false"));
-  $("r-venc").value="";$("r-tipo").value="";$("r-qtd").value="0";$("r-obs").value="";$("r-foto").value="";paintFotos();
+  $("r-venc").value="";$("r-tipo").value="";$("r-qtd").value="";if(window.QW&&QW.r)QW.r.reset();$("r-obs").value="";$("r-foto").value="";paintFotos();
   document.querySelectorAll("#v-ruas .field.bad").forEach(f=>setErr(f.id,""));setMode(S?"end":mode);paint();
 }
 $("r-save").addEventListener("click",async()=>{
@@ -367,6 +367,7 @@ function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].fo
 const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Qtd_Etiqueta","Qtd_Fisico","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao","Vl_Ult_Entrada","Valor_Total","Divergencia_Un","Valor_Divergencia","Numero_OS"];
 const CAR_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Matricula_Conferente","Nome_Conferente","Box","Numero_OS","Codigo_Produto","Descricao_Produto","Quantidade","Motivo","Causador","Matricula_Causador","Nome_Causador","Valor_Total","ID_Sessao"];
 function csv(){const ab=$("f-aba").value,cols=ab==="retorno"?RET_COLS:ab==="cargas"?CAR_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
+$("x-nc").onclick=imprimirNCsPlanilha;
 $("x-ruas").onclick=async()=>{
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
   const name=({retorno:"Auditoria_Retorno_",cargas:"Auditoria_Cargas_"}[$("f-aba").value]||"Auditoria_Ruas_")+todayISO()+".csv",data=csv();
@@ -867,10 +868,43 @@ async function carregarFech(manual){if(FECH.busy)return;
   FECH.busy=false;renderFech();}
 IDB.get("fech_cache").then(c=>{if(c&&c.dados&&!FECH.dados){FECH.dados=c.dados;FECH.info="Última cópia da planilha: "+String(c.info||"").replace(/^Planilha Google · atualizado /,"");}}).catch(()=>{});
 
+// impressão de todas as NCs da planilha (somente ADM)
+function regPeriodo(){const pv=$("f-periodo").value;let from=0,to=Infinity,lab="todo o histórico";
+  if(pv==="d"){const de=$("f-de").value,ate=$("f-ate").value||de;if(de){from=dayStart(de);to=dayStart(ate)+864e5;lab=de.split("-").reverse().join("/")+(ate!==de?" a "+ate.split("-").reverse().join("/"):"");}}
+  else{const days=+pv;if(days){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-(days-1));from=d.getTime();lab=days===1?"hoje":"últimos "+days+" dias";}}
+  return {from,to,lab};}
+function ncPlanHTML(j,per){const sel=r=>r.ts>=per.from&&r.ts<per.to;
+  const ruas=fxRows(j.ruas).filter(sel).filter(r=>pbool(r.Possui_NC)).sort((a,b)=>a.ts-b.ts);
+  const ret=fxRows(j.retorno).filter(sel).filter(r=>pbool(r.Possui_NC)).sort((a,b)=>a.ts-b.ts);
+  const car=fxRows(j.cargas).filter(sel).sort((a,b)=>a.ts-b.ts);
+  const oc=r=>[pbool(r.Erro_Produto)?"Lugar errado"+(r.Endereco_Correto?" (correto "+fmtAddr(r.Endereco_Correto)+")":""):"",pbool(r.Prox_Vencimento)?"Vencimento"+(r.Data_Vencimento?" "+r.Data_Vencimento:""):"",pbool(r.Sem_Saldo)?"Sem saldo":"",pbool(r.Avaria)?"Avaria"+(r.Tipo_Avaria?" ("+r.Tipo_Avaria+")":""):""].filter(Boolean).join("; ");
+  const dt=r=>String(r.DataHora||"").slice(0,16);const soma=(L,k)=>L.reduce((a,r)=>a+pnum(r[k]),0);
+  const sec=(tit,head,rows,tot)=>'<div class="fx-c" style="margin-top:10px"><h3>'+tit+' <span style="float:right;color:#64748B">'+rows.length+' registro'+(rows.length===1?'':'s')+(tot?' · '+tot:'')+'</span></h3>'+fxTable(head,rows)+'</div>';
+  return '<div class="fx-h"><div><h1>Não conformidades — planilha Google</h1><p>Período: <b>'+esc(per.lab)+'</b></p></div><div class="r">Gerado: <b>'+fmtDT(new Date())+'</b><br>Por: <b>'+esc(nomeAud())+'</b></div></div>'+
+    fxKpis([{t:"Ruas",v:ruas.length,c:"#DC2626",s:BRL0(soma(ruas,"Valor_Divergencia"))},{t:"Retorno",v:ret.length,c:"#DC2626",s:BRL0(soma(ret,"Valor_Divergencia"))},{t:"Cargas",v:car.length,c:"#DC2626",s:BRL0(soma(car,"Valor_Total"))},{t:"Total de NCs",v:ruas.length+ret.length+car.length,c:"#0F172A"}])+
+    sec("Auditoria de ruas",[{t:"Data"},{t:"Endereço"},{t:"Item"},{t:"Ocorrência"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Repositor"},{t:"Auditor"},{t:"Status"}],
+      ruas.map(r=>[dt(r),'<b>'+esc(fmtAddr(r.Endereco))+'</b>',esc((r.Produto||"")+(r.Descricao_Produto?" – "+String(r.Descricao_Produto).slice(0,30):"")),esc(oc(r)),pnum(r.Qtd_Divergencia_Un),BRL0(pnum(r.Valor_Divergencia)),esc(curto(r.Nome_Colaborador_NC||"")),esc(curto(r.Nome_Auditor||"")),esc(r.Status_NC||"")]),BRL0(soma(ruas,"Valor_Divergencia")))+
+    sec("Auditoria de retorno",[{t:"Data"},{t:"Rua"},{t:"O.S."},{t:"Item"},{t:"Etiq.",n:1},{t:"Fís.",n:1},{t:"Dif.",n:1},{t:"Valor div.",n:1},{t:"Ocorrência"},{t:"Responsável"},{t:"Status"}],
+      ret.map(r=>{const d=pnum(r.Divergencia_Un);return [dt(r),esc(unz(r.Rua)),esc(r.Numero_OS||""),esc(r.Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),pnum(r.Qtd_Etiqueta),pnum(r.Qtd_Fisico),(d>0?"+":"")+d,BRL0(pnum(r.Valor_Divergencia)),esc([d?"Divergência":"",pbool(r.Prox_Vencimento)?"Vencimento":""].filter(Boolean).join("; ")||"Não conforme"),esc(curto(r.Nome_Colaborador_NC||"")),esc(r.Status_NC||"")];}),BRL0(soma(ret,"Valor_Divergencia")))+
+    sec("Auditoria de cargas",[{t:"Data"},{t:"O.S."},{t:"Box"},{t:"Item"},{t:"Motivo"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Causador"},{t:"Conferente"}],
+      car.map(r=>[dt(r),esc(r.Numero_OS),esc(r.Box),esc(r.Codigo_Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),esc(r.Motivo),pnum(r.Quantidade),BRL0(pnum(r.Valor_Total)),esc((r.Causador?r.Causador+": ":"")+curto(r.Nome_Causador||"")),esc(curto(r.Nome_Conferente||""))]),BRL0(soma(car,"Valor_Total")))+
+    '<div class="fx-f"><span>Não conformidades da planilha · '+esc(per.lab)+'</span><span>Santa Therezinha</span></div>';}
+async function imprimirNCsPlanilha(){if(!temPerm("aud_adm")){toast("Somente administradores.");return;}
+  if(DEMO||!SHEET_URL){toast("Use o site com login para ler a planilha.");return;}if(!navigator.onLine){toast("Sem internet: a impressão lê a planilha Google.");return;}
+  const bt=$("x-nc");bt.disabled=true;const old=bt.textContent;bt.textContent="Lendo a planilha…";
+  try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=fechamento&token="+encodeURIComponent(LOGIN.token)+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
+    if(!j||!j.ok||!j.ruas)throw new Error((j&&j.erro)||"Atualize o Apps Script para a versão 13.");
+    const per=regPeriodo();openDoc({html:'<div class="pd fx">'+ncPlanHTML(j,per)+'</div>',multi:true,land:true,name:"Nao_conformidades_"+todayISO()+".pdf",title:"Não conformidades – planilha",
+      short:"Não conformidades da planilha – "+per.lab,text:"*NÃO CONFORMIDADES – PLANILHA*\nPeríodo: "+per.lab});}
+  catch(e){toast(e.message||"Não foi possível ler a planilha.");}
+  finally{bt.disabled=false;bt.textContent=old;}}
+function paintXnc(){const b=$("x-nc");if(b)b.hidden=!temPerm("aud_adm");}
+
+
 // auditoria de retorno (por rua, vários lançamentos)
 let SR=store.get("audcd_sessao_ret",null);
 const RT={prod:null,venc:false,nc:false,fr:"",fe:"",rot:null};
-const tProd=picker($("t-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{RT.prod=k;if(k!=null&&!$("t-os").value.trim())acharRotina();paintRT();if(k!=null)setTimeout(()=>$("t-qe").focus(),50);}});
+const tProd=picker($("t-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{RT.prod=k;if(k!=null&&!$("t-os").value.trim())acharRotina();paintRT();if(k!=null)setTimeout(()=>QW.qe&&QW.qe.focus(),50);}});
 function aplicarRotina(o){RT.rot=o||null;const h=$("t-rot");
   if(!o){h.textContent=ROTINA.length?"Não encontrei esta O.S./item na rotina 8457 carregada. O responsável fica o repositor da rua.":"Com a rotina 8457 importada, o repositor responsável é puxado pela O.S. ou pelo item + rua.";h.style.color="";return;}
   if(o.func&&o.nome&&!cIdx.has(o.func))addC(o.func,o.nome,"REPOSITOR (ROTINA)");
@@ -931,7 +965,7 @@ function renderRS(){const box=$("rs-box");if(!box)return;
         (r.Possui_NC?'<span class="tag nc">'+(d?'Dif. '+(d>0?'+':'')+d+' un':r.Prox_Vencimento?'Vence '+esc(r.Data_Vencimento):'Não conforme')+'</span>':'<span class="tag ok">Conforme</span>')+'</div></div>'+
         '<div><div class="v">Etiq. '+esc(r.Qtd_Etiqueta)+' · Fís. '+esc(r.Qtd_Fisico)+'<br>'+BRL.format(+r.Valor_Total||0)+'</div><div class="act"><button type="button" class="btn sm" data-rx="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>';}).join("")+'</div>':"";
   $("t-list").querySelectorAll("[data-rx]").forEach(b=>b.onclick=()=>delRec(b.dataset.rx).then(()=>renderRS()));}
-function paintRT(){if(!$("t-info"))return;renderRS();const k=RT.prod;
+function paintRT(){if(!$("t-info"))return;if(window.QW&&QW.qe){QW.qe.refresh();QW.qf.refresh();}renderRS();const k=RT.prod;
   if(k!=null){const pk=eByProd.get(P.cod[k]);const outra=pk!=null&&SR&&E.pt[pk][0]!==SR.rua;
     $("t-info").innerHTML=(pk!=null?rackHTML(pk,"Endereço de picking do item",null,'<div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span><span>R$ '+VL4.format(P.vl[k])+'/un</span>'+(E.qt[pk]?'<span>'+E.qt[pk]+' un/cx</span>':'')+'</div>'):'<div class="rack empty">Item sem endereço na base 8022.</div>')+
       (outra?'<p class="note" style="color:var(--alert)">Atenção: o picking deste item fica na rua '+E.pt[pk][0]+', não na rua '+esc(SR.rua)+'.</p>':'');
@@ -947,7 +981,7 @@ function paintRT(){if(!$("t-info"))return;renderRS();const k=RT.prod;
   $("t-rep-h").textContent=RT.rot?"Responsável pela rotina 8457 (O.S. "+RT.rot.os+").":SR?"Repositor da rua: "+curto(SR.repNome)+".":"";
   $("t-fr-f").querySelector(".lbl").innerHTML="Foto do retorno"+(nc?" <small>(obrigatória)</small>":" <small>(opcional)</small>");
   fotoBox("fr");fotoBox("fe");}
-function resetRT(){tProd.clear();tRep.clear();RT.prod=null;RT.rot=null;$("t-os").value="";aplicarRotina(null);RT.venc=false;RT.nc=false;RT.fr="";RT.fe="";["t-qe","t-qf","t-venc","t-obs"].forEach(i=>$(i).value="");
+function resetRT(){tProd.clear();tRep.clear();RT.prod=null;RT.rot=null;$("t-os").value="";aplicarRotina(null);RT.venc=false;RT.nc=false;RT.fr="";RT.fe="";["t-qe","t-qf","t-venc","t-obs"].forEach(i=>$(i).value="");if(window.QW&&QW.qe){QW.qe.reset();QW.qf.reset();}
   document.querySelectorAll(".tg[data-t]").forEach(b=>b.setAttribute("aria-pressed","false"));document.querySelectorAll("#v-retorno .field.bad").forEach(f=>setErr(f.id,""));setRepSess();paintRT();}
 $("t-save").addEventListener("click",async()=>{
   if(!auditor){toast("Faça login primeiro.");return;}if(!SR){toast("Inicie a rua primeiro.");return;}
@@ -999,7 +1033,7 @@ function openRetDoc(S,recs,onClose){const vdiv=recs.reduce((a,r)=>a+(+r.Valor_Di
 // auditoria de cargas
 let SC=store.get("audcd_sessao_car",null);
 const CG={prod:null,mot:"",fotos:[],cau:""};
-const gProd=picker($("g-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{CG.prod=k;paintCG();if(k!=null)setTimeout(()=>$("g-qtd").focus(),50);}});
+const gProd=picker($("g-prod"),{ph:"Código ou descrição do produto",search:searchProd,describe:descProd,onPick:k=>{CG.prod=k;paintCG();if(k!=null)setTimeout(()=>QW.g&&QW.g.focus(),50);}});
 const gq=()=>{const v=String($("g-qtd").value).trim();return v===""?null:Math.max(0,parseInt(v,10)||0);};
 document.querySelectorAll("[data-gq]").forEach(b=>b.addEventListener("click",()=>{const i=$("g-qtd");i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.gq);paintCG();}));
 $("g-qtd").addEventListener("input",paintCG);
@@ -1041,7 +1075,7 @@ function renderCS(){const box=$("cs-box");if(!box)return;
       '<div class="li"><div><div class="d"><b>'+esc(r.Codigo_Produto)+'</b> – '+esc(r.Descricao_Produto)+'</div><div class="tags"><span class="tag '+(r.Motivo==="Sobras"?"":"nc")+'">'+esc(r.Motivo)+'</span>'+(r.Causador?'<span class="tag">'+esc(r.Causador)+': '+esc(curto(r.Nome_Causador))+'</span>':'')+((r.fotos||[]).length?'<span class="tag">'+r.fotos.length+' foto'+(r.fotos.length>1?'s':'')+'</span>':'')+'</div></div>'+
       '<div><div class="v">'+esc(r.Quantidade)+' un<br>'+BRL.format(+r.Valor_Total||0)+'</div><div class="act"><button type="button" class="btn sm" data-gx="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>').join("")+'</div>':"";
   $("g-list").querySelectorAll("[data-gx]").forEach(b=>b.onclick=()=>delRec(b.dataset.gx).then(()=>renderCS()));}
-function paintCG(){if(!$("g-info"))return;renderCS();const k=CG.prod;
+function paintCG(){if(!$("g-info"))return;if(window.QW&&QW.g)QW.g.refresh();renderCS();const k=CG.prod;
   if(k!=null){const pk=eByProd.get(P.cod[k]);$("g-info").innerHTML='<div class="rack" style="margin-top:10px"><div class="rack-body"><div class="d">'+esc(P.desc[k])+'</div><div class="m"><span>Cód. '+esc(P.cod[k])+'</span><span>R$ '+VL4.format(P.vl[k])+'/un</span>'+(pk!=null?'<span>Picking '+esc(E.id[pk])+'</span>':'')+'</div></div></div>';
     $("g-cx-h").textContent=pk!=null&&E.qt[pk]?"1 caixa = "+E.qt[pk]+" un":"";}else{$("g-info").innerHTML="";$("g-cx-h").textContent="";}
   const q=gq()||0,vl=k!=null?P.vl[k]:0;$("g-valor").textContent=BRL.format(q*vl);$("g-calc").textContent=q+" un × "+BRL.format(vl);
@@ -1053,7 +1087,7 @@ function paintCG(){if(!$("g-info"))return;renderCS();const k=CG.prod;
   const box=$("g-fotos");box.innerHTML=CG.fotos.map((s,i)=>'<div class="ph-it"><img src="'+s+'" alt="Foto '+(i+1)+'"><button type="button" data-i="'+i+'" aria-label="Remover foto">×</button></div>').join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>{CG.fotos.splice(+b.dataset.i,1);paintCG();});
   $("g-cam").hidden=$("g-gal").hidden=CG.fotos.length>=3;}
-function resetCG(){gProd.clear();CG.prod=null;CG.mot="";CG.fotos=[];CG.cau="";gSep.clear();$("g-qtd").value="";document.querySelectorAll("#v-cargas .field.bad").forEach(f=>setErr(f.id,""));paintCG();}
+function resetCG(){gProd.clear();CG.prod=null;CG.mot="";CG.fotos=[];CG.cau="";gSep.clear();$("g-qtd").value="";if(window.QW&&QW.g)QW.g.reset();document.querySelectorAll("#v-cargas .field.bad").forEach(f=>setErr(f.id,""));paintCG();}
 $("g-save").addEventListener("click",async()=>{
   if(!auditor){toast("Faça login primeiro.");return;}if(!SC){toast("Inicie a conferência primeiro.");return;}
   const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const q=gq();
@@ -1098,6 +1132,31 @@ function carText(S,recs){const m=porMotivo(recs),tot=recs.reduce((a,r)=>a+(+r.Va
 function openCarDoc(S,recs,onClose){const tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0);
   openDoc({html:carDocHTML(S,recs),multi:true,name:"Carga_OS"+S.os+"_"+S.id+".pdf",title:"Auditoria de carga – O.S. "+S.os,
     short:"Auditoria de carga – O.S. "+S.os+" – Box "+S.box+" – "+BRL.format(tot),text:carText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
+
+// quantidade em caixas + unidades (fator QTUNITCX da 8022)
+window.QW={};
+function fatorCx(k){if(k==null)return 0;const pk=eByProd.get(P.cod[k]);return pk!=null?(E.qt[pk]||0):0;}
+function qtdCxUn(id,prodFn){const inp=$(id);if(!inp)return null;const st=inp.closest(".stepper");if(st)st.hidden=true;
+  const w=document.createElement("div");w.className="cxun";
+  const bloco=(k,lab)=>'<div><span class="cxl">'+lab+'</span><div class="stepper"><button type="button" data-d="-1" data-w="'+k+'" aria-label="Diminuir '+lab+'">−</button><input class="in" type="number" inputmode="numeric" min="0" step="1" data-w="'+k+'" placeholder="0" aria-label="'+lab+'"><button type="button" data-d="1" data-w="'+k+'" aria-label="Aumentar '+lab+'">+</button></div></div>';
+  w.innerHTML='<div class="cxun-r">'+bloco("cx","Caixas")+bloco("un","Unidades")+'</div><div class="cxun-t"></div>';
+  (st||inp).after(w);
+  const cx=w.querySelector('input[data-w="cx"]'),un=w.querySelector('input[data-w="un"]'),tt=w.querySelector(".cxun-t");
+  const val=i=>i.value===""?null:Math.max(0,parseInt(i.value,10)||0);
+  function paintT(){const f=prodFn()!=null?fatorCx(prodFn()):0;const sem=prodFn()!=null&&!f;cx.disabled=sem;w.classList.toggle("semcx",sem);
+    if(sem&&cx.value!==""){cx.value="";}
+    const tot=inp.value===""?null:+inp.value,c=val(cx)||0,u=val(un)||0;
+    tt.innerHTML=(f?'1 cx = <b>'+f+' un</b>':(prodFn()==null?'Escolha o item para usar caixas.':'Item sem qtd. por caixa na 8022: informe em unidades.'))+
+      (tot!=null?' · Total: <b class="cxun-tot">'+tot+' un</b>'+(f&&c?' <small>('+c+' cx × '+f+(u?' + '+u+' un':'')+')</small>':''):'');}
+  function sync(){const f=fatorCx(prodFn()),c=val(cx),u=val(un);const novo=(c==null&&u==null)?"":String((c||0)*f+(u||0));
+    if(String(inp.value)!==novo){inp.value=novo;paintT();inp.dispatchEvent(new Event("input",{bubbles:true}));}else paintT();}
+  cx.addEventListener("input",sync);un.addEventListener("input",sync);
+  w.querySelectorAll("button[data-d]").forEach(b=>b.onclick=()=>{const i=b.dataset.w==="cx"?cx:un;if(i.disabled)return;i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.d);sync();});
+  return {reset(){cx.value="";un.value="";inp.value="";paintT();},refresh(){if(cx.value!==""||un.value!=="")sync();else paintT();},focus(){(cx.disabled?un:cx).focus();},
+    resumo(){const c=val(cx)||0,u=val(un)||0,f=fatorCx(prodFn());return f&&c?c+" cx"+(u?" + "+u+" un":""):"";}};}
+QW.r=qtdCxUn("r-qtd",()=>R.prod);QW.qe=qtdCxUn("t-qe",()=>RT.prod);QW.qf=qtdCxUn("t-qf",()=>RT.prod);QW.g=qtdCxUn("g-qtd",()=>CG.prod);
+Object.values(QW).forEach(q=>q&&q.reset());
+
 
 // modo offline (site)
 if("serviceWorker" in navigator&&/^https?:$/.test(location.protocol)&&!window.claude&&!/claude\.ai|claudeusercontent/.test(location.hostname)){
