@@ -830,8 +830,6 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
   rot.forEach(o=>{if(RUAS_FORA.has(o.rua))return;repsDaRua(o.rua).forEach(m=>{const x=P(m);x.os++;x.ruas.add(o.rua);});});
   aud.forEach(a=>{const r=ruaDe(a);if(RUAS_FORA.has(r))return;repsDaRua(r).forEach(m=>{const x=P(m);x.aud++;if(a._ok)x.ok++;x.dif+=a._dif;x.ruas.add(r);});});
   QUADRO.forEach(q=>{const ru=q.ruas.filter(r=>!RUAS_FORA.has(r));if(ru.length&&!reps[q.mat]){const x=P(q.mat);ru.forEach(r=>x.ruas.add(r));}});
-  const ops={};const O=k=>ops[k]=ops[k]||{n:k,os:0,aud:0,ok:0};rot.forEach(o=>O(o.nome||"—").os++);aud.forEach(a=>{if(!a._rot)return;const x=O(a._rot.nome||"—");x.aud++;if(a._ok)x.ok++;});
-  const opsRua={};rot.forEach(o=>{(opsRua[o.rua]=opsRua[o.rua]||new Set()).add(curto(o.nome||""));});
   const nAud=aud.length,nOk=aud.filter(a=>a._ok).length,nMatch=aud.filter(a=>a._rot).length,q=nAud?nOk/nAud:null,cob=rot.length?nMatch/rot.length:null;
   const fora=aud.filter(a=>!a._ok).sort((a,b)=>Math.abs(b._dif)-Math.abs(a._dif)).slice(0,10);
   const audT={};aud.forEach(a=>{const k=a.Nome_Auditor||"—";audT[k]=(audT[k]||0)+1;});
@@ -840,12 +838,11 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
     fxKpis([{t:"OS na rotina",v:rot.length,c:"#0F172A",s:"retornos lançados no período"},{t:"Retornos auditados",v:nAud},{t:"Cobertura",v:pc1(cob),c:"#0E7490",s:nMatch+" OS encontradas na rotina"},
       {t:"Dentro da margem (±"+marg+")",v:pc1(q),c:q==null?"#64748B":FXC[fxCls(q)],s:nOk+" de "+nAud+" auditorias"},{t:"Fora da margem",v:nAud-nOk,c:"#DC2626"},
       {t:"Repositores avaliados",v:repsL.filter(x=>x.aud).length,c:"#0F172A",s:"de "+repsL.length+" no quadro"}])+
-    '<div class="fx-g"><div class="fx-col">'+fxCard("Qualidade do retorno por rua (margem ±"+marg+" un)",fxMapa(qRua,"Qualidade = auditorias com |contagem − etiqueta| ≤ "+marg+" ÷ auditorias da rua. Rua da rotina pela coluna RUA_O; repositor pelo Quadro_Repositores."))+
-      fxCard("Retornos por rua — repositor (quadro) × operador (rotina)",(function(){const H=[{t:"Rua"},{t:"Repositor"},{t:"Operador(es)"},{t:"OS",n:1},{t:"Aud.",n:1},{t:"Etiq.",n:1},{t:"Cont.",n:1},{t:"Qualid.",n:1}];
-        return fxTable(H,Object.entries(ruas).filter(([k])=>k).sort((a,b)=>(+a[0])-(+b[0])).map(([k,x])=>['<b>'+esc(k)+'</b>',esc(repNomes(k)),esc([...(opsRua[k]||[])].filter(Boolean).join(", ")||"—"),x.os,x.aud,x.qe,x.qf,x.aud?'<b style="color:'+FXC[fxCls(x.ok/x.aud)]+'">'+pc0(x.ok/x.aud)+'</b>':'—']));})())+'</div>'+
-    '<div class="fx-col">'+fxCard("Repositores — qualidade do retorno (Quadro_Repositores)",fxBars(repsL.filter(x=>x.aud).sort((a,b)=>b.ok/b.aud-a.ok/a.aud||b.aud-a.aud).map(x=>({l:curto(x.n)+" · ruas "+[...x.ruas].sort((a,b)=>a-b).join(",")+" ("+x.aud+"/"+x.os+" OS)",v:x.ok/x.aud,txt:pc1(x.ok/x.aud),c:FXC[fxCls(x.ok/x.aud)]})),{max:1}))+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Qualidade do retorno por rua (margem ±"+marg+" un)",fxMapa(qRua,"Qualidade = auditorias com |contagem − etiqueta| ≤ "+marg+" ÷ auditorias da rua. Rua pela coluna RUA_O da rotina; repositor pelo quadro de repositores."))+
+      fxCard("Retornos por rua — repositor",(function(){const H=[{t:"Rua"},{t:"Repositor"},{t:"OS",n:1},{t:"Aud.",n:1},{t:"Etiq.",n:1},{t:"Cont.",n:1},{t:"Qualid.",n:1}];
+        return fxTable(H,Object.entries(ruas).filter(([k])=>k).sort((a,b)=>(+a[0])-(+b[0])).map(([k,x])=>['<b>'+esc(k)+'</b>',esc(repNomes(k)),x.os,x.aud,x.qe,x.qf,x.aud?'<b style="color:'+FXC[fxCls(x.ok/x.aud)]+'">'+pc0(x.ok/x.aud)+'</b>':'—']));})())+'</div>'+
+    '<div class="fx-col">'+fxCard("Repositores — qualidade do retorno",fxBars(repsL.filter(x=>x.aud).sort((a,b)=>b.ok/b.aud-a.ok/a.aud||b.aud-a.aud).map(x=>({l:curto(x.n)+" · ruas "+[...x.ruas].sort((a,b)=>a-b).join(",")+" ("+x.aud+"/"+x.os+" OS)",v:x.ok/x.aud,txt:pc1(x.ok/x.aud),c:FXC[fxCls(x.ok/x.aud)]})),{max:1}))+
       fxCard("Repositores sem retorno auditado no período",(function(){const L=repsL.filter(x=>!x.aud).sort((a,b)=>b.os-a.os);return L.length?'<div class="fx-chips">'+L.map(x=>'<span class="s-na">'+esc(curto(x.n))+' · ruas '+[...x.ruas].sort((a,b)=>a-b).join(",")+' · '+x.os+' OS</span>').join("")+'</div>':'<p class="fx-e">Todos os repositores tiveram retorno auditado.</p>';})())+
-      fxCard("Operadores de empilhadeira (coluna NOME da rotina)",fxBars(Object.values(ops).sort((a,b)=>b.os-a.os).map(x=>({l:curto(x.n)+" ("+x.aud+" auditados)",v:x.os,txt:x.os+" OS",c:"#64748B"}))))+
       fxCard("Auditorias fora da margem",fxTable([{t:"Rua"},{t:"OS"},{t:"Item"},{t:"Repositor"},{t:"Etiq.",n:1},{t:"Cont.",n:1},{t:"Dif.",n:1}],
         fora.map(a=>[esc(ruaDe(a)),esc(a._rot?a._rot.os:(a._os||"—")),esc(a._cod),esc(repNomes(ruaDe(a))),a._qe,a._qf,'<b style="color:#DC2626">'+(a._dif>0?"+":"")+a._dif+'</b>'])))+
       fxCard("Auditores — retornos auditados",fxBars(Object.entries(audT).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:n,v,txt:v+" ret.",c:"#3B82F6"}))))+'</div></div>'+fxFoot("Retorno × Rotina 8457");}
@@ -997,7 +994,7 @@ function aplicarRotina(o){RT.rot=o||null;const h=$("t-rot");
   if(!o){h.textContent=ROTINA.length?"Não encontrei esta O.S./item na rotina 8457 carregada. O responsável fica o repositor da rua.":"Com a rotina 8457 importada, o repositor responsável é puxado pela O.S. ou pelo item + rua.";h.style.color="";return;}
   const reps=repsDaRua(o.rua).filter(m=>cIdx.has(m));if(reps.length)tRep.set(cIdx.get(reps[0]));else setRepSess();
   if(!$("t-os").value.trim())$("t-os").value=o.os;
-  h.style.color="var(--ok)";h.textContent="Rotina 8457: O.S. "+o.os+" · "+(o.d?o.d.split("-").reverse().join("/")+" · ":"")+"rua "+o.rua+" · "+o.qtd+" un · operador "+curto(o.nome)+". Responsável: "+(reps.length?reps.map(m=>curto(nomeC(m))).join(" e ")+" (repositor da rua "+o.rua+")":"repositor da rua")+".";}
+  h.style.color="var(--ok)";h.textContent="Rotina 8457: O.S. "+o.os+" · "+(o.d?o.d.split("-").reverse().join("/")+" · ":"")+"rua "+o.rua+" · "+o.qtd+" un. Responsável: "+(reps.length?reps.map(m=>curto(nomeC(m))).join(" e ")+" (repositor da rua "+o.rua+")":"repositor da rua")+".";}
 function acharRotina(){const os=$("t-os").value.replace(/\D/g,"");let o=null;
   if(os){const L=rotinaPorOS(os);o=(RT.prod!=null&&L.find(x=>x.cod===P.cod[RT.prod]))||L[0]||null;if(o&&RT.prod==null&&pIdx.has(o.cod)){RT.prod=pIdx.get(o.cod);tProd.set(RT.prod);}}
   else if(RT.prod!=null){o=rotinaPorItem(P.cod[RT.prod],SR&&SR.rua)[0]||rotinaPorItem(P.cod[RT.prod])[0]||null;}
@@ -1308,17 +1305,15 @@ async function enviarRotina(linhas){if(DEMO||!SHEET_URL||!navigator.onLine||!(LO
   try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"rotina_salvar",token:LOGIN.token,linhas}),redirect:"follow",cache:"no-store"});const j=await r.json();if(!j.ok)throw new Error(j.erro);return j;}catch(e){toast("Rotina salva neste aparelho. Envio à planilha: "+(e.message||"falhou"));return false;}}
 $("br-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("br-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
   try{const wb=await lerLivro(file);const linhas=parseRotinaWB(wb);ROTINFO={ts:Date.now(),nome:file.name};mesclarRotina(linhas);
-    linhas.forEach(a=>{if(a[6]&&!cIdx.has(a[6])&&a[7])addC(a[6],a[7],"OPERADOR (ROTINA 8457)");});
     const dias=[...new Set(linhas.map(a=>a[0]).filter(Boolean))].sort();msg.textContent=linhas.length+" OS lidas ("+(dias.length?fdISO(dias[0])+(dias.length>1?" a "+fdISO(dias[dias.length-1]):""):"sem data")+"). Enviando à planilha…";paintBases();
     const j=await enviarRotina(linhas);msg.textContent=linhas.length+" OS lidas"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba Rotina_Retorno).":" · guardadas neste aparelho.");toast("Rotina 8457 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
 async function carregarApoio(){if(DEMO||!SHEET_URL||!navigator.onLine||!(LOGIN&&LOGIN.token))return;
   try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=apoio&token="+encodeURIComponent(LOGIN.token)+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();if(!j||!j.ok)return;
     (j.colaboradores||[]).forEach(a=>{if(a[0]&&a[1]){addC(String(a[0]),a[1],a[2]||"");const L=store.get("audcd_colab_extra",[]);if(!L.some(x=>x.m===String(a[0]))){L.push({m:String(a[0]),n:a[1],f:a[2]||"",sync:true});store.set("audcd_colab_extra",L);}}});
-    if(Array.isArray(j.rotina)){ROTINA=j.rotina.map(a=>[isoDe(a[0]),String(a[1]),String(a[2]),a[3],a[4],String(a[5]),String(a[6]),a[7]]);ROTINFO={ts:Date.now(),nome:"planilha (aba Rotina_Retorno)"};IDB.set("rotina",{rows:ROTINA,info:ROTINFO}).catch(()=>{});
-      ROTINA.forEach(a=>{if(a[6]&&!cIdx.has(a[6])&&a[7])addC(a[6],a[7],"OPERADOR (ROTINA 8457)");});}
+    if(Array.isArray(j.rotina)){ROTINA=j.rotina.map(a=>[isoDe(a[0]),String(a[1]),String(a[2]),a[3],a[4],String(a[5]),String(a[6]),a[7]]);ROTINFO={ts:Date.now(),nome:"planilha (aba Rotina_Retorno)"};IDB.set("rotina",{rows:ROTINA,info:ROTINFO}).catch(()=>{});}
     enviarColabs();paintBases();}catch(e){}}
-function reposRotina(){ROTINA.forEach(a=>{if(a[6]&&!cIdx.has(a[6])&&a[7])addC(a[6],a[7],"OPERADOR (ROTINA 8457)");});}
+function reposRotina(){}
 IDB.get("base_c").then(c=>{if(c&&c.txt){loadC(c.txt);aplicarExtras();reposRotina();BASEINFO.c=c.info;}}).catch(()=>{}).then(()=>IDB.get("rotina")).then(c=>{if(c&&c.rows&&!ROTINA.length){ROTINA=c.rows;ROTINFO=c.info;reposRotina();}}).catch(()=>{});
 
 
