@@ -780,7 +780,7 @@ function fxRuas(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.ruas),tit="Quali
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Ocorrências por tipo (peso)",fxDonut(tipos))+
       fxCard("Auditores — ruas inspecionadas",fxBars(Object.entries(aud).sort((a,b)=>b[1].size-a[1].size).map(([n,s])=>({l:curto(n),v:s.size,txt:s.size+" rua"+(s.size>1?"s":""),c:"#3B82F6"}))))+
       fxCard("Maiores divergências por rua (R$)",fxBars(Object.entries(valRua).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([r,v])=>({l:"Rua "+r,v,txt:BRL0(v),c:"#B45309"}))))+'</div>'+
-    fxFull("Qualidade média por dia auditado — últimos 30 dias",fxLine(linha.filter(x=>x.txt!==""),"#16A34A","%"))+fxFoot("Qualidade de Ruas");}
+    fxFoot("Qualidade de Ruas");}
 
 /* ---- Retorno ---- */
 function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r=>!RUAS_FORA.has(unz(r.Rua))).filter(r=>!RUAS_FORA.has(unz(r.Rua))).map(r=>Object.assign(r,{_nc:pbool(r.Possui_NC),_rua:unz(r.Rua),_qe:pnum(r.Qtd_Etiqueta),_qf:pnum(r.Qtd_Fisico),_vd:pnum(r.Valor_Divergencia),_du:pnum(r.Divergencia_Un)})),tit="Auditoria de Retorno — Fechamento";
@@ -813,7 +813,7 @@ function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Ocorrências",fxDonut([{l:"Divergência de quantidade",v:div,c:"#EF4444"},{l:"Próximo do vencimento",v:venc,c:"#EAB308"},{l:"Retorno não conforme",v:manual,c:"#6366F1"},{l:"Conforme",v:conf,c:"#16A34A"}]))+
       fxCard("Auditores de retorno — itens auditados",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:v+" ite"+(v===1?"m":"ns"),c:"#3B82F6"}))))+
       fxCard("Maiores divergências",fxTable([{t:"Rua"},{t:"Item"},{t:"Etiq.",n:1},{t:"Fís.",n:1},{t:"Valor",n:1}],top.map(r=>[esc(r._rua),esc(r.Produto+" – "+String(r.Descricao_Produto||"").slice(0,20)),r._qe,r._qf,'<b style="color:'+(r._vd<0?"#DC2626":"#B45309")+'">'+BRL0(r._vd)+'</b>'])))+'</div>'+
-    fxFull("Conformidade por dia auditado — últimos 30 dias",fxLine(linha.filter(x=>x.txt!==""),"#0E7490","%"))+fxFoot("Auditoria de Retorno");}
+    fxFoot("Auditoria de Retorno");}
 
 /* ---- Cargas ---- */
 function fxCar(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.cargas).map(r=>Object.assign(r,{_q:pnum(r.Quantidade),_v:pnum(r.Valor_Total)})),tit="Auditoria de Cargas — Fechamento";
@@ -1040,11 +1040,11 @@ function fxAero(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.aero).map(r=>Obj
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Ruas com mais ocorrências",fxBars(Object.entries(ruas).sort((a,b)=>b[1].i-a[1].i).slice(0,6).map(([k,x])=>({l:"Rua "+k,v:x.i,txt:x.i+" · "+BRL0(x.v),c:"#0EA5E9"}))))+
       fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))))+
       fxCard("Resumo",'<p class="fx-e" style="color:#0F172A">Encarregado do setor: <b>'+ENC_AERO.nome+'</b>.<br>Cada lançamento é uma não conformidade do operador.</p>')+'</div>'+
-    fxFull("Não conformidades lançadas por dia — últimos 30 dias (não depende do filtro)",fxLine(linha,"#DC2626"))+fxFoot("Auditoria Aéreo");}
+    fxFoot("Auditoria Aéreo");}
 
 /* ---- Setores ---- */
 function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&FECH.dados.sobras.length)?FECH.dados.sobras:SOBRAS;
-  return src.map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10])})).filter(o=>o.ts);}
+  return dedupSobras(src).map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10])})).filter(o=>o.ts);}
 function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const per=r=>r.ts>=de&&r.ts<ate;
   const ruas=fxNoPeriodo(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),ret=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),car=fxNoPeriodo(FECH.dados&&FECH.dados.cargas),
     aer=fxNoPeriodo(FECH.dados&&FECH.dados.aero),sobAll=sobrasRows(),sob=sobAll.filter(per);
@@ -1076,7 +1076,7 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,8).map(x=>({l:curto(x.n)+" · "+x.set,v:x.i,txt:String(x.i),c:"#DC2626"}))))+
       fxCard("Sobras da rotina 8074 — separadores",fxBars((function(){const o={};sob.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,8);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+x.q+" un",c:"#7C3AED"}))))+
       fxCard("Setor com mais NCs",pior&&pior.n?'<p style="margin:4px 0;font-size:22px;font-weight:700;color:'+pior.c+'">'+esc(pior.l)+'</p><p class="fx-e" style="color:#0F172A">'+pior.n+' não conformidades ('+(tot?pc0(pior.n/tot):"")+' do total) · '+BRL0(pior.v)+'</p>':'<p class="fx-e">Sem NCs no período.</p>')+'</div>'+
-    fxFull("Não conformidades por dia e setor — últimos 30 dias (não depende do filtro)",multi)+fxFoot("Setores auditados");}
+    fxFoot("Setores auditados");}
 
 // auditoria aéreo (operadores de empilhadeira)
 const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
@@ -1146,18 +1146,19 @@ function parse8074WB(wb){for(const sn of wb.SheetNames){const rows=XLSX.utils.sh
       const acao=String(row[iA]||"");const m=acao.match(/(?:QT|Quantidade)\s*:?\s*(\d+)/i);const qt=m?+m[1]:0;
       const sp=v=>{const s=String(v||"").trim();const mm=s.match(/^(\d+)\s*-\s*(.+)$/);return mm?[mm[1],mm[2].trim()]:["",s==="-"?"":s];};
       const cf=sp(row[iCf]),se=sp(row[iS]),os=String(row[iO]).trim().replace(/\.0+$/,""),cod=String(row[iC]).trim().replace(/\.0+$/,"");
-      const k=[ds,os,cod,qt,se[0]].join("|");if(seen.has(k))continue;seen.add(k);
+      const k=os+"|"+cod;if(seen.has(k))continue;seen.add(k);
       const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
       out.push([ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,k]);}
     if(out.length)return out;}
   throw new Error("Não encontrei as colunas MOTIVO, CODPROD e O.S/Carreg. (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
 $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
-  try{const wb=await lerLivro(file);const L=parse8074WB(wb);const m=new Map(SOBRAS.map(a=>[a[11],a]));L.forEach(a=>m.set(a[11],a));SOBRAS=[...m.values()];SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
-    msg.textContent=L.length+" sobras (quantidade superior) lidas. Enviando à planilha…";paintBases();
+  try{const wb=await lerLivro(file);const L=parse8074WB(wb);SOBRAS=dedupSobras(SOBRAS.concat(L));SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
+    msg.textContent=L.length+" sobras (quantidade superior) lidas, sem duplicatas (mesma O.S. e item contam uma vez). Enviando à planilha…";paintBases();
     let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Sobras guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
-    msg.textContent=L.length+" sobras (quantidade superior)"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+").":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+    msg.textContent=L.length+" sobras (quantidade superior), sem duplicatas"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas da planilha":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
-IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=c.rows;SOBINFO=c.info;}}).catch(()=>{});
+function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2]);if(!m.has(k))m.set(k,a);});return [...m.values()];}
+IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows);SOBINFO=c.info;}}).catch(()=>{});
 
 
 // auditoria de retorno (por rua, vários lançamentos)
