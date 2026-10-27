@@ -1051,7 +1051,7 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
   const S=[{k:"rep",l:"Reposição — ruas",c:"#16A34A",n:ruas.length,v:ruas.reduce((a,r)=>a+pnum(r.Valor_Divergencia),0),rows:ruas},
     {k:"ret",l:"Reposição — retorno",c:"#0E7490",n:ret.length,v:ret.reduce((a,r)=>a+Math.abs(pnum(r.Valor_Divergencia)),0),rows:ret},
     {k:"conf",l:"Cargas — conferência",c:"#0EA5E9",n:car.filter(r=>r.Causador!=="Separador").length,v:car.filter(r=>r.Causador!=="Separador").reduce((a,r)=>a+pnum(r.Valor_Total),0),rows:car.filter(r=>r.Causador!=="Separador")},
-    {k:"sep",l:"Separação — cargas + 8074",c:"#7C3AED",n:car.filter(r=>r.Causador==="Separador").length+sob.length,v:car.filter(r=>r.Causador==="Separador").reduce((a,r)=>a+pnum(r.Valor_Total),0)+sob.reduce((a,o)=>a+o.v,0),rows:car.filter(r=>r.Causador==="Separador").concat(sob)},
+    {k:"sep",l:"Separação — cargas + sobras 8074",c:"#7C3AED",n:car.filter(r=>r.Causador==="Separador").length+sob.length,v:car.filter(r=>r.Causador==="Separador").reduce((a,r)=>a+pnum(r.Valor_Total),0)+sob.reduce((a,o)=>a+o.v,0),rows:car.filter(r=>r.Causador==="Separador").concat(sob)},
     {k:"aer",l:"Aéreo — empilhadeira",c:"#DC2626",n:aer.length,v:aer.reduce((a,r)=>a+pnum(r["Vlr. Total"]),0),rows:aer}];
   const tot=S.reduce((a,s)=>a+s.n,0),totV=S.reduce((a,s)=>a+s.v,0),pior=S.slice().sort((a,b)=>b.n-a.n)[0];
   const pessoas={};const add=(n,set,v)=>{if(!n)return;const x=pessoas[n+"|"+set]=pessoas[n+"|"+set]||{n,set,i:0,v:0};x.i++;x.v+=v;};
@@ -1070,11 +1070,11 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
     fxKpis(S.map(s=>({t:s.l,v:s.n,c:s.c,s:BRL0(s.v)+(tot?" · "+Math.round(s.n/tot*100)+"%":"")})).concat([{t:"Total de NCs",v:tot,c:"#0F172A",s:BRL0(totV)}]))+
     '<div class="fx-g"><div class="fx-col">'+fxCard("Setores com mais não conformidades",fxBars(S.slice().sort((a,b)=>b.n-a.n).map(s=>({l:s.l,v:s.n,txt:s.n+" NC",c:s.c}))))+
       fxCard("Detalhe por setor",fxTable([{t:"Setor"},{t:"NCs",n:1},{t:"% do total",n:1},{t:"Valor",n:1},{t:"Origem"}],S.map(s=>['<b style="color:'+s.c+'">'+esc(s.l)+'</b>',s.n,tot?pc0(s.n/tot):"—",BRL0(s.v),
-        esc({rep:"Auditoria de ruas",ret:"Auditoria de retorno",conf:"Cargas — causador conferente",sep:(car.filter(r=>r.Causador==="Separador").length)+" cargas (separador) + "+sob.length+" ocorrências de quantidade inferior (8074)",aer:"Auditoria aéreo"}[s.k])])))+'</div>'+
+        esc({rep:"Auditoria de ruas",ret:"Auditoria de retorno",conf:"Cargas — causador conferente",sep:(car.filter(r=>r.Causador==="Separador").length)+" cargas (separador) + "+sob.length+" sobras da rotina 8074 (quantidade superior)",aer:"Auditoria aéreo"}[s.k])])))+'</div>'+
     '<div class="fx-col">'+fxCard("Participação no total",fxDonut(S.map(s=>({l:s.l,v:s.n,c:s.c}))))+
       fxCard("Valor por setor",fxBars(S.slice().sort((a,b)=>b.v-a.v).map(s=>({l:s.l,v:s.v,txt:BRL0(s.v),c:s.c}))))+'</div></div>'+
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,8).map(x=>({l:curto(x.n)+" · "+x.set,v:x.i,txt:String(x.i),c:"#DC2626"}))))+
-      fxCard("Rotina 8074 (quantidade inferior) — separadores",fxBars((function(){const o={};sob.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,8);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+x.q+" un",c:"#7C3AED"}))))+
+      fxCard("Sobras da rotina 8074 — separadores",fxBars((function(){const o={};sob.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,8);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+x.q+" un",c:"#7C3AED"}))))+
       fxCard("Setor com mais NCs",pior&&pior.n?'<p style="margin:4px 0;font-size:22px;font-weight:700;color:'+pior.c+'">'+esc(pior.l)+'</p><p class="fx-e" style="color:#0F172A">'+pior.n+' não conformidades ('+(tot?pc0(pior.n/tot):"")+' do total) · '+BRL0(pior.v)+'</p>':'<p class="fx-e">Sem NCs no período.</p>')+'</div>'+
     fxFull("Não conformidades por dia e setor — últimos 30 dias (não depende do filtro)",multi)+fxFoot("Setores auditados");}
 
@@ -1135,13 +1135,13 @@ function cardAer(r){const fl=(k)=>r[k]==null?"":r[k];
    (r.Observacao?'<dl><dt>Obs.</dt><dd>'+esc(r.Observacao)+'</dd></dl>':'')+'</details>';}
 const aOpIni=store.get("audcd_aero_op",null);if(aOpIni&&cIdx.has(aOpIni))aOp.set(cIdx.get(aOpIni));
 
-// rotina 8074 – quantidade inferior
+// rotina 8074 – quantidade superior (sobras)
 let SOBRAS=[],SOBINFO=null;
 function parse8074WB(wb){for(const sn of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""});
     const H=findHeader(rows,[x=>x==="MOTIVO",x=>x==="CODPROD",x=>x.startsWith("OSCARREG")||x==="OS"]);if(!H)continue;const ix=f=>H.h.findIndex(f);
     const iD=ix(x=>x==="DATA"),iM=ix(x=>x==="MOTIVO"),iO=ix(x=>x.startsWith("OSCARREG")||x==="OS"),iC=ix(x=>x==="CODPROD"),iDe=ix(x=>x==="DESCRICAO"),iA=ix(x=>x==="ACAO"),iCf=ix(x=>x==="CONFERENTE"),iS=ix(x=>x==="SEPARADOR"),iOp=ix(x=>x==="OPERACAO");
     const out=[],seen=new Set();
-    for(let r=H.i+1;r<rows.length;r++){const row=rows[r];if(!/INFERIOR/i.test(String(row[iM])))continue;
+    for(let r=H.i+1;r<rows.length;r++){const row=rows[r];if(!/SUPERIOR/i.test(String(row[iM])))continue;
       const d=row[iD] instanceof Date?row[iD]:null;const ds=d?(isoDe(d)+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())):String(row[iD]||"").trim();
       const acao=String(row[iA]||"");const m=acao.match(/(?:QT|Quantidade)\s*:?\s*(\d+)/i);const qt=m?+m[1]:0;
       const sp=v=>{const s=String(v||"").trim();const mm=s.match(/^(\d+)\s*-\s*(.+)$/);return mm?[mm[1],mm[2].trim()]:["",s==="-"?"":s];};
@@ -1150,12 +1150,12 @@ function parse8074WB(wb){for(const sn of wb.SheetNames){const rows=XLSX.utils.sh
       const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
       out.push([ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,k]);}
     if(out.length)return out;}
-  throw new Error("Não encontrei as colunas MOTIVO, CODPROD e O.S/Carreg. (rotina 8074) ou nenhuma linha de QUANTIDADE INFERIOR.");}
+  throw new Error("Não encontrei as colunas MOTIVO, CODPROD e O.S/Carreg. (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
 $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
   try{const wb=await lerLivro(file);const L=parse8074WB(wb);const m=new Map(SOBRAS.map(a=>[a[11],a]));L.forEach(a=>m.set(a[11],a));SOBRAS=[...m.values()];SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
-    msg.textContent=L.length+" ocorrências de quantidade inferior lidas. Enviando à planilha…";paintBases();
+    msg.textContent=L.length+" sobras (quantidade superior) lidas. Enviando à planilha…";paintBases();
     let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Ocorrências guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
-    msg.textContent=L.length+" ocorrências de quantidade inferior"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+").":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+    msg.textContent=L.length+" sobras (quantidade superior)"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+").":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
 IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=c.rows;SOBINFO=c.info;}}).catch(()=>{});
 
