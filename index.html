@@ -89,15 +89,16 @@
       <div><label for="f-ate">Até</label><input class="in" type="date" id="f-ate"></div>
     </div>
     <p class="sync" id="sync-line" hidden></p>
-    <div id="pend-box"></div>
-    <div id="list"></div>
-    <div class="export">
+    <div class="export" style="margin:0 0 12px">
       <button type="button" class="save" id="x-pr" style="margin:0 0 4px">Imprimir lista</button>
       <button type="button" class="btn full" id="x-orig">Imprimir documentos originais das NCs</button>
-      <p class="note" style="margin:-2px 0 6px">Documentos originais = os mesmos PDFs que o auditor gera (NC individual, relatório da rua, do retorno e da carga), com assinaturas, um por página.</p>
+      <p class="note" style="margin:-2px 0 6px">Documentos originais = os mesmos PDFs que o auditor gera (NC individual, relatório da rua, do retorno e as faltas da carga para o conferente), com assinaturas, um por página.</p>
       <button type="button" class="btn full" id="x-ruas">Baixar CSV</button>
       <p class="note">O CSV respeita o período e o filtro acima, com as mesmas colunas da planilha. No Google Planilhas: Arquivo → Importar → Anexar à planilha atual, separador ponto e vírgula.</p>
       <div id="copy-area"></div>
+    <div id="pend-box"></div>
+    <div id="list"></div>
+
     </div>
   </section>
 
@@ -244,7 +245,7 @@
   <button type="button" data-v="painel">Painel</button>
   <button type="button" data-v="bases">Bases</button>
   <button type="button" data-v="admin" hidden>Adm</button>
-  <button type="button" data-v="fechamento" class="desk" hidden>Fechamento</button>
+  <button type="button" data-v="fechamento" hidden>Fechamento</button>
 </nav>
 
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sh-t">

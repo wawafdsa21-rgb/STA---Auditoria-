@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 15)
+ * Auditoria STA – Santa Therezinha (versão 16)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -119,26 +119,29 @@ function doGet(e) {
     if (p.acao === 'fechamento') {
       const s = validarToken(p.token);
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
-      if (s.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'O fechamento é só para administradores (aud_adm).' });
-      return resposta({
+      const tem = function (x) { return s.permissoes.indexOf('aud_adm') >= 0 || s.permissoes.indexOf(x) >= 0; };
+      if (!tem('aud_rua') && !tem('aud_ret') && !tem('aud_car')) return resposta({ ok: false, erro: 'Sem permissão para o fechamento.' });
+      const vazio = { colunas: ['ID_Auditoria'], registros: [] };
+      const out = {
         ok: true,
-        ruas: lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
+        ruas: !tem('aud_rua') ? vazio : lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
           'Sem_Saldo', 'Avaria', 'Possui_NC', 'Qtd_Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em',
           'Produto', 'Descricao_Produto', 'Endereco_Correto', 'Data_Vencimento', 'Tipo_Avaria', 'Vl_Ult_Entrada', 'Observacao', 'Predio', 'Nivel', 'Apto', 'Funcao_Colaborador_NC']),
-        retorno: lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
+        retorno: !tem('aud_ret') ? vazio : lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
           'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS', 'Data_Vencimento', 'Observacao', 'Vl_Ult_Entrada', 'Funcao_Colaborador_NC']),
-        rotina: lerRotina(ss, 400),
-        cargas: lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
+        rotina: !tem('aud_ret') ? [] : lerRotina(ss, 400),
+        cargas: !tem('aud_car') ? vazio : lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
           'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
         quadro: lerQuadro(ss)
-      });
+      };
+      return resposta(out);
     }
     if (p.acao === 'registros') {
       const s = validarToken(p.token);
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 15, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 16, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }

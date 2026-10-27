@@ -283,6 +283,7 @@ nav button{font-size:.98rem!important;padding:0 2px}
 @media (prefers-reduced-motion: reduce){.sw i,.sw i::after{transition:none}}
 nav[data-n="6"] button{font-size:.86rem!important}
 nav[data-n="7"] button{font-size:.78rem!important;letter-spacing:-.01em}
+nav[data-n="8"] button{font-size:.7rem!important;letter-spacing:-.02em}
 .row2q{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row2q .field{margin-top:0}
 .row2q label{font-size:.85rem}
