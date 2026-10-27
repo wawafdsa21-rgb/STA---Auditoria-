@@ -992,7 +992,7 @@ function docsOriginais(lista,base){const docs=[],feitos=new Set();const asc=list
     if(aba==="ruas"){if(r.ID_Sessao){if(feitos.has("s"+r.ID_Sessao))return;feitos.add("s"+r.ID_Sessao);const L=doGrupo(r,"ruas");docs.push({html:sessDocHTML(sessaoDe(r,L),L.slice().reverse()),multi:true});}
       else if(pbool(r.Possui_NC))docs.push({html:docHTML(r),multi:false});}
     else if(aba==="retorno"){const k="r"+(r.ID_Sessao||r.ID_Auditoria);if(feitos.has(k))return;feitos.add(k);const L=r.ID_Sessao?doGrupo(r,"retorno"):[r];docs.push({html:retDocHTML(sessaoDe(r,L),L),multi:true});}
-    else if(aba==="cargas"){const k="c"+(r.ID_Sessao||r.Numero_OS);if(feitos.has(k))return;feitos.add(k);const L=base.filter(x=>x._aba==="cargas"&&(r.ID_Sessao?x.ID_Sessao===r.ID_Sessao:x.Numero_OS===r.Numero_OS)).sort((a,b)=>a.ts-b.ts);if(L.some(x=>x.Motivo==="Falta"))docs.push({html:carDocHTML(sessaoDe(r,L),L),multi:true});}});
+    else if(aba==="cargas"){const k="c"+(r.ID_Sessao||r.Numero_OS);if(feitos.has(k))return;feitos.add(k);const L=base.filter(x=>x._aba==="cargas"&&(r.ID_Sessao?x.ID_Sessao===r.ID_Sessao:x.Numero_OS===r.Numero_OS)).sort((a,b)=>a.ts-b.ts);if(L.some(x=>x.Causador==="Conferente"))docs.push({html:carDocHTML(sessaoDe(r,L),L),multi:true});}});
   return docs;}
 async function makePdfLista(docs){if(!window.html2canvas)await loadScript(H2C);if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(JSPDF);
   const pdf=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:"portrait"});let primeira=true;
@@ -1181,10 +1181,10 @@ function renderCS(){const box=$("cs-box");if(!box)return;
   box.innerHTML='<div class="sess-top"><div><h3>Box '+esc(SC.box)+' · O.S. '+esc(SC.os)+'</h3><div class="note" style="margin:4px 0 0">Conferente: <b>'+esc(SC.confNome)+'</b> · '+esc(SC.conf)+'</div></div></div>'+
     '<div class="cg-sum">'+Object.entries(m).map(([k,x])=>'<div><b>'+x.n+'</b><span>'+k+'</span></div>').join("")+'</div>'+
     '<div class="sess-stats" style="margin-top:8px"><span><b>'+recs.length+'</b> ite'+(recs.length===1?'m':'ns')+'</span><span><b>'+BRL.format(tot)+'</b> valor total</span></div>'+
-    '<button type="button" class="save" id="cs-rel" style="margin-top:12px">Imprimir faltas (conferente)</button><button type="button" class="btn full" id="cs-end" style="margin-top:8px">Finalizar carga</button>'+
-    '<p class="note" style="margin:6px 0 0">O documento do conferente traz só as <b>faltas</b>. Avaria, abastecimento e sobras ficam registradas para o fechamento.</p>';
+    '<button type="button" class="save" id="cs-rel" style="margin-top:12px">Imprimir NC do conferente</button><button type="button" class="btn full" id="cs-end" style="margin-top:8px">Finalizar carga</button>'+
+    '<p class="note" style="margin:6px 0 0">Só as ocorrências em que o <b>causador é o conferente</b> geram não conformidade impressa. As do separador ficam registradas para o fechamento.</p>';
   $("cs-rel").onclick=()=>{if(!recs.length){toast("Nenhum item lançado ainda.");return;}openCarDoc(SC,recs);};
-  $("cs-rel").textContent="Imprimir faltas (conferente)"+(m.Falta.n?" · "+m.Falta.n:"");
+  {const nConf=recs.filter(r=>r.Causador==="Conferente").length;$("cs-rel").textContent="Imprimir NC do conferente"+(nConf?" · "+nConf:"");}
   $("cs-end").onclick=()=>{if(!recs.length){if(confirm("Nenhum item lançado. Encerrar mesmo assim?")){SC=null;store.set("audcd_sessao_car",null);resetCG();renderCS();}return;}
     const s0=SC;openCarDoc(s0,recs,()=>{SC=null;store.set("audcd_sessao_car",null);resetCG();renderCS();toast("Conferência da O.S. "+s0.os+" finalizada.");});};
   $("g-list").innerHTML=recs.length?'<div class="block"><h3>Itens da O.S. '+esc(SC.os)+' <small>'+recs.length+'</small></h3>'+recs.map(r=>
@@ -1222,29 +1222,30 @@ $("g-save").addEventListener("click",async()=>{
   $("g-save").disabled=true;const ok=await saveRec(rec);$("g-save").disabled=false;
   resetCG();window.scrollTo(0,0);toast((ok||dbState==="off"?"Item salvo":"Salvo neste aparelho, envio pendente")+" – "+rec.Motivo+".");gProd.focus();
 });
-// cargas: impressão somente das faltas (documento do conferente)
+// cargas: impressão somente das ocorrências causadas pelo conferente
+const ehDoConf=r=>r.Causador==="Conferente";
 const ENC_REPOSICAO={nome:"FABIO NYCKOLAS FIGUEIREDO BOTERO",mat:"10003993"},ENC_CARGAS={nome:"LUCAS HENRIQUE NUNES",mat:"10001917"};
-function carDocHTML(S,recs){const L=recs.filter(r=>r.Motivo==="Falta").sort((a,b)=>a.ts-b.ts),tot=L.reduce((a,r)=>a+(+r.Valor_Total||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||pnum(r.Quantidade)||0),0);
+function carDocHTML(S,recs){const L=recs.filter(ehDoConf).sort((a,b)=>a.ts-b.ts),tot=L.reduce((a,r)=>a+(+r.Valor_Total||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||pnum(r.Quantidade)||0),0);
   const row=(k,v)=>'<tr><td class="k">'+k+'</td><td>'+(v===""||v==null?"–":esc(v))+'</td></tr>';const first=L[0],last=L[L.length-1];
-  return '<div class="pd"><div class="pd-h"><img src="'+LOGO_BLUE+'" alt="Santa Therezinha"><div class="r"><h1>Faltas na carga – O.S. '+esc(S.os)+'</h1><p>Box '+esc(S.box)+' · Nº '+esc(S.id)+'</p></div></div>'+
+  return '<div class="pd"><div class="pd-h"><img src="'+LOGO_BLUE+'" alt="Santa Therezinha"><div class="r"><h1>Não conformidades do conferente – O.S. '+esc(S.os)+'</h1><p>Box '+esc(S.box)+' · Nº '+esc(S.id)+'</p></div></div>'+
    '<h2>Identificação</h2><table>'+row("Período",(first?first.DataHora:"")+(last&&last!==first?" a "+String(last.DataHora).slice(11):""))+row("Box",S.box)+row("Número da O.S.",S.os)+
    row("Conferente",S.confNome+" – matrícula "+S.conf)+row("Auditor",(S.audNome||"")+" – matrícula "+S.aud)+'</table>'+
-   '<div class="sum"><div><b>'+L.length+'</b><span>itens em falta</span></div><div><b>'+un+'</b><span>unidades em falta</span></div><div><b>'+BRL.format(tot)+'</b><span>valor das faltas</span></div><div><b>'+esc(S.box)+'</b><span>box</span></div></div>'+
-   '<h2>Itens em falta</h2><table class="lt"><thead><tr><th>Item</th><th>Qtd. (un)</th><th>Vl. un.</th><th>Valor</th></tr></thead><tbody>'+
-   L.map(r=>{const q=+r.Quantidade||pnum(r.Quantidade)||0,v=+r.Valor_Total||pnum(r.Valor_Total)||0;return '<tr><td>'+esc(r.Codigo_Produto+" – "+r.Descricao_Produto)+'</td><td class="n">'+q+'</td><td class="n">'+BRL.format(+r.Vl_Unit||(q?v/q:0))+'</td><td class="n">'+BRL.format(v)+'</td></tr>';}).join("")+
-   '</tbody><tfoot><tr><td>Total</td><td class="n">'+un+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
+   '<div class="sum"><div><b>'+L.length+'</b><span>ocorrências do conferente</span></div><div><b>'+un+'</b><span>unidades</span></div><div><b>'+BRL.format(tot)+'</b><span>valor</span></div><div><b>'+esc(S.box)+'</b><span>box</span></div></div>'+
+   '<h2>Ocorrências em que o conferente foi o causador</h2><table class="lt"><thead><tr><th>Item</th><th>Motivo</th><th>Qtd. (un)</th><th>Vl. un.</th><th>Valor</th></tr></thead><tbody>'+
+   L.map(r=>{const q=+r.Quantidade||pnum(r.Quantidade)||0,v=+r.Valor_Total||pnum(r.Valor_Total)||0;return '<tr><td>'+esc(r.Codigo_Produto+" – "+r.Descricao_Produto)+'</td><td>'+esc(r.Motivo)+'</td><td class="n">'+q+'</td><td class="n">'+BRL.format(+r.Vl_Unit||(q?v/q:0))+'</td><td class="n">'+BRL.format(v)+'</td></tr>';}).join("")+
+   '</tbody><tfoot><tr><td colspan="2">Total</td><td class="n">'+un+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
    '<p class="decl" style="margin-top:6px">Valores pelo Vl. ult. entrada da base 286.</p>'+
-   '<p class="decl">Declaro ciência das faltas registradas na auditoria da carga da O.S. '+esc(S.os)+', box '+esc(S.box)+'.</p>'+
+   '<p class="decl">Declaro ciência das não conformidades de minha responsabilidade registradas na auditoria da carga da O.S. '+esc(S.os)+', box '+esc(S.box)+'.</p>'+
    '<div class="sg"><div><b>Conferente</b>'+esc(S.confNome)+'<small>Matrícula '+esc(S.conf)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(S.audNome||"")+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Encarregado da equipe de cargas</b>'+ENC_CARGAS.nome+'<small>Matrícula '+ENC_CARGAS.mat+'</small><small>Data: ___/___/______</small></div></div></div>';}
-function carText(S,recs){const L=recs.filter(r=>r.Motivo==="Falta"),tot=L.reduce((a,r)=>a+(+r.Valor_Total||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||0),0);
-  return ["*FALTAS NA CARGA – O.S. "+S.os+"*","Box "+S.box,"Conferente: "+S.confNome+" ("+S.conf+")","Auditor: "+(S.audNome||"")+" ("+S.aud+")",L.length+" itens · "+un+" un","*Valor das faltas: "+BRL.format(tot)+"*"].join("\n");}
-function openCarDoc(S,recs,onClose){const F=recs.filter(r=>r.Motivo==="Falta");
-  if(!F.length){toast("Nenhuma falta nesta carga: não há documento para o conferente.");if(onClose)onClose();return;}
+function carText(S,recs){const L=recs.filter(ehDoConf),tot=L.reduce((a,r)=>a+(+r.Valor_Total||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||0),0);
+  return ["*NC DO CONFERENTE – O.S. "+S.os+"*","Box "+S.box,"Conferente: "+S.confNome+" ("+S.conf+")","Auditor: "+(S.audNome||"")+" ("+S.aud+")",L.length+" itens · "+un+" un","*Valor: "+BRL.format(tot)+"*"].join("\n");}
+function openCarDoc(S,recs,onClose){const F=recs.filter(ehDoConf);
+  if(!F.length){toast("Nenhuma ocorrência causada pelo conferente: não há não conformidade para imprimir.");if(onClose)onClose();return;}
   const tot=F.reduce((a,r)=>a+(+r.Valor_Total||0),0);
-  openDoc({html:carDocHTML(S,recs),multi:true,name:"Faltas_OS"+S.os+"_"+S.id+".pdf",title:"Faltas na carga – O.S. "+S.os,
-    short:"Faltas na carga – O.S. "+S.os+" – Box "+S.box+" – "+BRL.format(tot),text:carText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
+  openDoc({html:carDocHTML(S,recs),multi:true,name:"NC_Conferente_OS"+S.os+"_"+S.id+".pdf",title:"NC do conferente – O.S. "+S.os,
+    short:"NC do conferente – O.S. "+S.os+" – Box "+S.box+" – "+BRL.format(tot),text:carText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
 
 
 
