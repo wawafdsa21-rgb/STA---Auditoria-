@@ -78,7 +78,7 @@
       <div class="stat"><b id="s-valor">R$ 0</b><span>em NC abertas</span></div>
     </div>
     <div class="filters">
-      <select class="in" id="f-aba" aria-label="Tipo de auditoria"><option value="todas" selected>Todas as auditorias</option><option value="ruas">Auditoria de ruas</option><option value="retorno">Auditoria de retorno</option><option value="cargas">Auditoria de cargas</option></select>
+      <select class="in" id="f-aba" aria-label="Tipo de auditoria"><option value="todas" selected>Todas as auditorias</option><option value="ruas">Auditoria de ruas</option><option value="retorno">Auditoria de retorno</option><option value="cargas">Auditoria de cargas</option><option value="aero">Auditoria aéreo</option></select>
       <select class="in" id="f-fonte" aria-label="Fonte" hidden><option value="planilha">Planilha Google (todos)</option><option value="local">Este aparelho</option></select>
       <select class="in" id="f-periodo" aria-label="Período"><option value="1">Hoje</option><option value="7" selected>Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="0">Tudo</option><option value="d">Escolher data</option></select>
       <select class="in" id="f-tipo" aria-label="Tipo"><option value="todos">Todos os lançamentos</option><option value="nc" selected>Só não conformidades</option><option value="ok">Só conformes</option></select>
@@ -137,6 +137,24 @@
     <button type="button" class="save" id="t-save">Salvar e lançar próximo</button>
     </div>
     <div id="t-list" style="margin-top:12px"></div>
+  </section>
+
+  <section class="view" id="v-aero" hidden>
+    <p class="note" style="margin:0 0 10px">Data automática: <b id="a-data"></b>. Cada lançamento gera uma não conformidade para o operador.</p>
+    <div class="block">
+      <div class="field" id="a-op-f"><label>Operador de empilhadeira</label><div id="a-op"></div></div>
+      <div class="field" id="a-prod-f"><label>Código / descrição do item</label><div id="a-prod"></div></div>
+      <div class="row3" style="margin-top:14px"><div class="field" id="a-rua-f"><label for="a-rua">Rua</label><input class="in" id="a-rua" inputmode="numeric" placeholder="Ex.: 1"></div>
+        <div class="field" id="a-os-f"><label for="a-os">O.S.</label><input class="in" id="a-os" inputmode="numeric" placeholder="Ex.: 12711360"></div></div>
+      <div class="field" id="a-tipo-f"><label for="a-tipo">Tipo de O.S.</label><input class="in" id="a-tipo" inputmode="numeric" placeholder="Ex.: 59"></div>
+    </div>
+    <div class="block">
+      <div class="field" id="a-qtd-f"><label for="a-qtd">Quantidade encontrada</label><div class="stepper"><button type="button" data-aq="-1" aria-label="Diminuir">−</button><input class="in" id="a-qtd" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-aq="1" aria-label="Aumentar">+</button></div></div>
+      <div class="money"><span>Valor total<br><small id="a-calc"></small></span><b id="a-valor">R$ 0,00</b></div>
+      <div class="field" id="a-obs-f"><label for="a-obs">Observação</label><textarea class="in" id="a-obs" placeholder="Opcional"></textarea></div>
+    </div>
+    <button type="button" class="save" id="a-save">Salvar e lançar próximo</button>
+    <div id="a-list" style="margin-top:12px"></div>
   </section>
 
   <section class="view" id="v-admin" hidden><div id="adm"></div></section>
@@ -232,6 +250,14 @@
       <p class="okline" id="br-msg"></p>
     </div>
 
+    <div class="block">
+      <h3>Sobras de separação (8074)</h3>
+      <div class="bstat"><span id="bs-src">Nenhuma rotina carregada</span><span><b id="bs-n">0</b> sobras</span></div>
+      <label class="filebtn" style="width:100%">Importar rotina 8074 (.xls ou .xlsx)<input type="file" id="bs-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <p class="hint">Só as linhas de <b>QUANTIDADE SUPERIOR</b> (sobra) entram e contam como não conformidade da separação. Valor = quantidade × Vl. ult. entrada (286). Vai para a aba de sobras da planilha.</p>
+      <p class="okline" id="bs-msg"></p>
+    </div>
+
     <button type="button" class="btn full" id="b-reset">Voltar às bases originais</button>
     <p class="note">As bases atualizadas ficam guardadas neste aparelho. Atualize em cada celular usado na auditoria.</p>
   </section>
@@ -241,6 +267,7 @@
   <button type="button" data-v="ruas" aria-current="page">Ruas</button>
   <button type="button" data-v="retorno" hidden>Retorno</button>
   <button type="button" data-v="cargas" hidden>Cargas</button>
+  <button type="button" data-v="aero" hidden>Aéreo</button>
   <button type="button" data-v="registros">Registros<span class="badge" id="nav-pend" hidden></span></button>
   <button type="button" data-v="painel">Painel</button>
   <button type="button" data-v="bases">Bases</button>

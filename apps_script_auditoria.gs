@@ -1,9 +1,11 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 16)
+ * Auditoria STA – Santa Therezinha (versão 17)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
  *   - Auditoria_Cargas   (permissão aud_car)
+ *   - Auditoria_Aero     (permissão aud_aer) – operadores de empilhadeira
+ *   - aba de sobras de separação (rotina 8074, importada pelo ADM)
  * Login pela aba Permissionamento (Matrícula, Permissão, Observação, Senha, Status).
  * Quem tem a permissão aud_adm administra os acessos pelo aplicativo.
  * Fotos vão para a pasta "Fotos Auditoria de Ruas" no Google Drive.
@@ -46,6 +48,12 @@ const ABAS = {
       'Motivo', 'Links_Fotos', 'ID_Sessao', 'Recebido_Em', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador'],
     texto: ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Matricula_Conferente', 'Box', 'Numero_OS',
       'Codigo_Produto', 'ID_Sessao', 'Matricula_Causador']
+  },
+  aero: {
+    nome: 'Auditoria_Aero', perm: 'aud_aer',
+    colunas: ['Data', 'Operador', 'Código', 'Descrição', 'Rua', 'O.S', 'Tipo de O.S', 'Quantidade', 'Vlr. Total',
+      'ID_Auditoria', 'DataHora', 'Matricula_Operador', 'Vl_Ult_Entrada', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em'],
+    texto: ['Data', 'Código', 'O.S', 'ID_Auditoria', 'DataHora', 'Matricula_Operador', 'Matricula_Auditor']
   }
 };
 const MOTIVOS_CARGA = ['Falta', 'Avaria', 'Abastecimento', 'Sobras'];
@@ -63,6 +71,10 @@ function doPost(e) {
   if (!sessao.ok) return resposta({ ok: false, erro: sessao.erro, login: true });
 
   if (dados.acao === 'colab_salvar') return resposta(salvarColaboradores(dados.lista, sessao));
+  if (dados.acao === 'sobras_salvar') {
+    if (sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Importar a rotina 8074 é só para ADM.' });
+    return resposta(salvarSobras(dados.linhas, sessao));
+  }
   if (dados.acao === 'rotina_salvar') {
     if (sessao.permissoes.indexOf('aud_ret') < 0 && sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Importar a rotina exige aud_ret ou aud_adm.' });
     return resposta(salvarRotina(dados.linhas, sessao));
@@ -120,7 +132,7 @@ function doGet(e) {
       const s = validarToken(p.token);
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       const tem = function (x) { return s.permissoes.indexOf('aud_adm') >= 0 || s.permissoes.indexOf(x) >= 0; };
-      if (!tem('aud_rua') && !tem('aud_ret') && !tem('aud_car')) return resposta({ ok: false, erro: 'Sem permissão para o fechamento.' });
+      if (!tem('aud_rua') && !tem('aud_ret') && !tem('aud_car') && !tem('aud_aer')) return resposta({ ok: false, erro: 'Sem permissão para o fechamento.' });
       const vazio = { colunas: ['ID_Auditoria'], registros: [] };
       const out = {
         ok: true,
@@ -132,6 +144,9 @@ function doGet(e) {
         rotina: !tem('aud_ret') ? [] : lerRotina(ss, 400),
         cargas: !tem('aud_car') ? vazio : lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
           'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
+        aero: !tem('aud_aer') ? vazio : lerAba(ss, ABAS.aero.nome, ['ID_Auditoria', 'Data', 'DataHora', 'Matricula_Operador', 'Operador', 'Código', 'Descrição', 'Rua', 'O.S',
+          'Tipo de O.S', 'Quantidade', 'Vl_Ult_Entrada', 'Vlr. Total', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em']),
+        sobras: s.permissoes.indexOf('aud_adm') < 0 ? [] : lerSobras(ss),
         quadro: lerQuadro(ss)
       };
       return resposta(out);
@@ -141,7 +156,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 16, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 17, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -157,6 +172,7 @@ const PERMISSOES_CONHECIDAS = {
   aud_rua: 'Acesso a aba de auditoria_ruas',
   aud_ret: 'Acesso a aba de auditoria_retorno',
   aud_car: 'Acesso a aba de auditoria_cargas',
+  aud_aer: 'Acesso a aba de auditoria_aero',
   aud_adm: 'Acesso a tela de administracao'
 };
 
@@ -436,6 +452,42 @@ function lerRotina(ss, dias) {
   const lim = new Date(); lim.setDate(lim.getDate() - dias);
   const limIso = Utilities.formatDate(lim, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   return sh.getRange(2, 1, sh.getLastRow() - 1, 8).getDisplayValues().filter(function (l) { return l[1] && (!l[0] || l[0] >= limIso); });
+}
+
+/* ===================== Sobras de separação (rotina 8074) ===================== */
+const CAB_SOBRAS = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Matricula_Conferente', 'Conferente',
+  'Matricula_Separador', 'Separador', 'Operacao', 'Valor_Total', 'Chave', 'Importado_Em'];
+function abaSobras(ss) {
+  const sh = ss.getSheets().filter(function (x) { return normalizar(x.getName()).indexOf('SOBRA') >= 0; })[0] || ss.insertSheet('Sobras_Separacao');
+  if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, CAB_SOBRAS.length).setValues([CAB_SOBRAS]).setFontWeight('bold');
+  const cab = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0].map(String);
+  CAB_SOBRAS.forEach(function (c) { if (cab.indexOf(c) < 0) { sh.getRange(1, cab.length + 1).setValue(c).setFontWeight('bold'); cab.push(c); } });
+  return { sh: sh, cab: cab };
+}
+function salvarSobras(linhas, sessao) {
+  const ss = abrirPlanilha(), A = abaSobras(ss), sh = A.sh, cab = A.cab, iK = cab.indexOf('Chave');
+  const ex = new Set(sh.getLastRow() > 1 ? sh.getRange(2, iK + 1, sh.getLastRow() - 1, 1).getDisplayValues().map(function (l) { return l[0]; }) : []);
+  const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'), novas = [];
+  (linhas || []).forEach(function (a) {
+    if (!a || !a[11] || ex.has(String(a[11]))) return; ex.add(String(a[11]));
+    const o = { Data: a[0], Numero_OS: a[1], Codigo_Produto: a[2], Descricao_Produto: a[3], Quantidade: Number(a[4]) || 0, Matricula_Conferente: a[5], Conferente: a[6],
+      Matricula_Separador: a[7], Separador: a[8], Operacao: a[9], Valor_Total: Number(a[10]) || 0, Chave: a[11], Importado_Em: agora };
+    novas.push(cab.map(function (h) { return o[h] === undefined ? '' : o[h]; }));
+  });
+  if (novas.length) {
+    const ini = sh.getLastRow() + 1;
+    ['Data', 'Numero_OS', 'Codigo_Produto', 'Matricula_Conferente', 'Matricula_Separador', 'Chave'].forEach(function (c) { const i = cab.indexOf(c); if (i >= 0) sh.getRange(ini, i + 1, novas.length, 1).setNumberFormat('@'); });
+    sh.getRange(ini, 1, novas.length, cab.length).setValues(novas);
+  }
+  return { ok: true, adicionados: novas.length, aba: sh.getName() };
+}
+/** [data, os, cod, desc, qtd, matConf, conf, matSep, sep, operacao, valor] */
+function lerSobras(ss) {
+  const sh = ss.getSheets().filter(function (x) { return normalizar(x.getName()).indexOf('SOBRA') >= 0; })[0];
+  if (!sh || sh.getLastRow() < 2) return [];
+  const v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues(), cab = v[0];
+  const ix = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Matricula_Conferente', 'Conferente', 'Matricula_Separador', 'Separador', 'Operacao', 'Valor_Total'].map(function (c) { return cab.indexOf(c); });
+  return v.slice(1).filter(function (l) { return ix[1] >= 0 && l[ix[1]]; }).map(function (l) { return ix.map(function (k) { return k < 0 ? '' : l[k]; }); });
 }
 
 /* ===================== Painel e fechamento ===================== */

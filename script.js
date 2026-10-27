@@ -63,7 +63,7 @@ function picker(root,opt){
   const wrap=root.querySelector(".pk-in"),inp=root.querySelector("input"),ul=root.querySelector("ul"),ch=root.querySelector(".chosen");
   let t=null,items=[],val=null;
   function render(){const q=inp.value;items=opt.search(q);if(!q.trim()){ul.innerHTML="";return;}
-    const novo=opt.search===searchColab;
+    const novo=opt.search===searchColab||!!opt.novo;
     ul.innerHTML=(items.length?items.map((it,k)=>'<li role="option" data-k="'+k+'"><span class="t">'+esc(it.t)+'</span><span class="s">'+esc(it.s)+'</span></li>').join(""):(novo?'':'<li class="none">Nada encontrado para “'+esc(q)+'”</li>'))+
       (novo?'<li class="pk-new" data-new="1"><span class="t">＋ Cadastrar novo colaborador</span><span class="s">'+(items.length?'Não está na lista? ':'Nada encontrado para “'+esc(q)+'”. ')+'Cadastre matrícula, nome e função.</span></li>':'');}
   inp.addEventListener("input",()=>{clearTimeout(t);t=setTimeout(render,110);});
@@ -116,9 +116,9 @@ let LOGIN=DEMO?{demo:true,perms:["aud_rua","aud_ret","aud_car"]}:store.get("audc
 const VIEW_PERM={ruas:"aud_rua",retorno:"aud_ret",cargas:"aud_car",admin:"aud_adm",fechamento:"aud_adm"};
 const temPerm=p=>!!(LOGIN&&LOGIN.perms&&LOGIN.perms.includes(p));
 const ehAdm=()=>temPerm("aud_adm");
-function podeVer(v){if(ehAdm())return true;switch(v){case "ruas":case "painel":return temPerm("aud_rua");case "retorno":return temPerm("aud_ret");case "cargas":return temPerm("aud_car");
-  case "fechamento":return temPerm("aud_rua")||temPerm("aud_ret")||temPerm("aud_car");default:return false;}}
-function primeiraTela(){return ["ruas","retorno","cargas","fechamento"].find(podeVer)||"fechamento";}
+function podeVer(v){if(ehAdm())return true;switch(v){case "ruas":case "painel":return temPerm("aud_rua");case "retorno":return temPerm("aud_ret");case "cargas":return temPerm("aud_car");case "aero":return temPerm("aud_aer");
+  case "fechamento":return temPerm("aud_rua")||temPerm("aud_ret")||temPerm("aud_car")||temPerm("aud_aer");default:return false;}}
+function primeiraTela(){return ["ruas","retorno","cargas","aero","fechamento"].find(podeVer)||"fechamento";}
 function aplicarPerms(){try{paintXnc();}catch(e){}let n=0;document.querySelectorAll("nav button").forEach(b=>{const ok=podeVer(b.dataset.v);b.hidden=!ok;if(ok)n++;});
   document.querySelector("nav").style.setProperty("--nav-n",n);document.querySelector("nav").dataset.n=n;
   const fa=$("f-aba");if(fa){[...fa.options].forEach(o=>o.hidden=!podeVer(o.value));if(!podeVer(fa.value)){const o=[...fa.options].find(x=>podeVer(x.value));if(o)fa.value=o.value;}}}
@@ -170,8 +170,8 @@ $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet"&&auditor)$("she
 paintWho(); if(DEMO&&!auditor)$("sheet").hidden=false;
 
 // navegação
-const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Inicie a rua e lance todos os retornos antes de finalizar."],cargas:["Auditoria de cargas","Informe Box, O.S. e conferente e lance os itens da carga."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],fechamento:["Fechamento","KPIs e gráficos de cada auditoria, para computador e impressão."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
-function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();if(v==="cargas")paintCG();["ruas","retorno","cargas","admin","fechamento","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);document.body.classList.toggle("wide",v==="fechamento");if(v==="admin")carregarAdmin();if(v==="fechamento"){renderFech();carregarFech();}if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
+const BAND={ruas:["Auditoria de ruas","Inicie a rua e lance os endereços em sequência."],retorno:["Auditoria de retorno","Inicie a rua e lance todos os retornos antes de finalizar."],aero:["Auditoria aéreo","Operadores de empilhadeira: lance as ocorrências; o valor é calculado pela 286."],cargas:["Auditoria de cargas","Informe Box, O.S. e conferente e lance os itens da carga."],admin:["Administração de acessos","Logins, senhas e acessos da aba Permissionamento."],fechamento:["Fechamento","KPIs e gráficos de cada auditoria, para computador e impressão."],registros:["Registros","Histórico das auditorias e não conformidades."],painel:["Painel de ruas","Qualidade por rua, evolução, previsão e ranking dos repositores."],bases:["Bases e planilha","Atualize as bases 286 e 8022 e o envio ao Google Sheets."]};
+function go(v){if(!BAND[v]||!podeVer(v))v=primeiraTela();if(v==="retorno")paintRT();if(v==="cargas")paintCG();if(v==="aero")paintAE();["ruas","retorno","cargas","aero","admin","fechamento","registros","painel","bases"].forEach(x=>$("v-"+x).hidden=x!==v);document.body.classList.toggle("wide",v==="fechamento");if(v==="admin")carregarAdmin();if(v==="fechamento"){renderFech();carregarFech();}if(v==="bases")paintBases();if(v==="painel"){renderPainel();carregarPainel();}
   document.querySelectorAll("nav button").forEach(b=>{if(b.dataset.v===v)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   $("band-t").textContent=BAND[v][0];$("band-p").textContent=BAND[v][1];window.scrollTo(0,0);if(v==="registros")renderRecords();}
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>go(b.dataset.v)));
@@ -331,7 +331,7 @@ function renderRecords(){if(typeof renderSess==="function")try{renderSess();}cat
   $("s-valor").textContent=BRL.format(ab.reduce((s,r)=>s+(+r.Valor_Divergencia||0),0)).replace(",00","");
   const list=filtered(),L=$("list");
   if(!list.length){L.innerHTML='<div class="empty">Nenhum registro com estes filtros.<br>Ajuste o período ou o tipo.</div>';return;}
-  const adm=temPerm("aud_adm");L.innerHTML=list.slice(0,200).map(r=>{let h=r._aba==="retorno"?cardRet(r):r._aba==="cargas"?cardCar(r):card(r);if(adm)h=h.replace(/<\/details>$/,'<button type="button" class="btn full rdel" data-id="'+esc(r.ID_Auditoria)+'" data-aba="'+esc(r._aba||"ruas")+'" style="margin-top:8px;color:var(--alert);border-color:var(--alert)">Excluir registro</button></details>');return h;}).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
+  const adm=temPerm("aud_adm");L.innerHTML=list.slice(0,200).map(r=>{let h=r._aba==="retorno"?cardRet(r):r._aba==="cargas"?cardCar(r):r._aba==="aero"?cardAer(r):card(r);if(adm)h=h.replace(/<\/details>$/,'<button type="button" class="btn full rdel" data-id="'+esc(r.ID_Auditoria)+'" data-aba="'+esc(r._aba||"ruas")+'" style="margin-top:8px;color:var(--alert);border-color:var(--alert)">Excluir registro</button></details>');return h;}).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
   L.querySelectorAll(".rdel").forEach(b=>b.onclick=()=>excluirRegistro(b.dataset.id,b.dataset.aba));
   L.querySelectorAll(".cgrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openCarDoc(recs[0].Sessao,recs);});
   L.querySelectorAll(".rtrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openRetDoc(recs[0].Sessao,recs);});
@@ -371,11 +371,11 @@ function norm2(r){const o=Object.assign({},r);["Endereco","Endereco_Correto"].fo
   if(typeof o.Vl_Ult_Entrada==="number")o.Vl_Ult_Entrada=Math.round(o.Vl_Ult_Entrada*100)/100;if(typeof o.Valor_Divergencia==="number")o.Valor_Divergencia=Math.round(o.Valor_Divergencia*100)/100;return o;}
 const RET_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Produto","Descricao_Produto","Rua","Prox_Vencimento","Data_Vencimento","Foto_Retorno","Foto_Etiqueta","Qtd_Etiqueta","Qtd_Fisico","Observacao","Possui_NC","Matricula_Colaborador_NC","Nome_Colaborador_NC","Funcao_Colaborador_NC","Status_NC","Responsavel_Tratativa","ID_Sessao","Vl_Ult_Entrada","Valor_Total","Divergencia_Un","Valor_Divergencia","Numero_OS"];
 const CAR_COLS=["ID_Auditoria","DataHora","Matricula_Auditor","Nome_Auditor","Matricula_Conferente","Nome_Conferente","Box","Numero_OS","Codigo_Produto","Descricao_Produto","Quantidade","Motivo","Causador","Matricula_Causador","Nome_Causador","Valor_Total","ID_Sessao"];
-function csv(){const ab=$("f-aba").value,cols=ab==="retorno"?RET_COLS:ab==="cargas"?CAR_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
+function csv(){const ab=$("f-aba").value,cols=ab==="retorno"?RET_COLS:ab==="cargas"?CAR_COLS:ab==="aero"?AER_COLS:COLS;return "\ufeff"+[cols.join(";")].concat(filtered().slice().reverse().map(r=>{const o=norm2(r);return cols.map(c=>cell(o[c])).join(";");})).join("\r\n");}
 $("x-ruas").onclick=async()=>{
   if($("f-aba").value==="todas"){toast("Escolha um tipo de auditoria para baixar o CSV.");return;}
   if(!filtered().length){toast("Nenhuma auditoria no período escolhido.");return;}
-  const name=({retorno:"Auditoria_Retorno_",cargas:"Auditoria_Cargas_"}[$("f-aba").value]||"Auditoria_Ruas_")+todayISO()+".csv",data=csv();
+  const name=({retorno:"Auditoria_Retorno_",cargas:"Auditoria_Cargas_",aero:"Auditoria_Aero_"}[$("f-aba").value]||"Auditoria_Ruas_")+todayISO()+".csv",data=csv();
   if(downloads){try{await downloads.save({filename:name,data:new Blob([data],{type:"text/csv"})});return;}catch(e){if(e&&e.code==="declined")return;if(e&&e.code==="rate_limited"){toast("Aguarde um instante e tente de novo.");return;}}}
   if(!window.claude){try{const u=URL.createObjectURL(new Blob([data],{type:"text/csv;charset=utf-8"}));const l=document.createElement("a");l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast("CSV baixado.");return;}catch(e){}}
   const a=$("copy-area");a.innerHTML='<label class="lbl" for="cp">Copie o conteúdo abaixo e cole no Google Planilhas (Dados → Dividir texto em colunas, separador ponto e vírgula).</label><textarea class="in copybox" id="cp" readonly></textarea><button type="button" class="btn full" id="cpb" style="margin-top:8px">Copiar</button>';
@@ -389,7 +389,8 @@ let SHEET_URL=store.get("audcd_sheet_url","");
 if(!SHEET_URL||SHEET_OLD.includes(SHEET_URL)){SHEET_URL=SHEET_DEFAULT;store.set("audcd_sheet_url","");}
 let syncing=false,syncAgain=false,lastSheetErr="",lastSheetOk=store.get("audcd_sheet_ok","");
 const SHEET_COLS=COLS.concat(["ID_Sessao"]);
-function toSheet(r){if(r._aba==="cargas"){const x={_aba:"cargas"};CAR_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.fotos=r.Motivo==="Sobras"?(r.fotos||[]):[];return x;}
+function toSheet(r){if(r._aba==="aero"){const x={_aba:"aero"};AER_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));return x;}
+  if(r._aba==="cargas"){const x={_aba:"cargas"};CAR_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.fotos=r.Motivo==="Sobras"?(r.fotos||[]):[];return x;}
   if(r._aba==="retorno"){const x={_aba:"retorno"};RET_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.foto_retorno=r.foto_retorno||"";x.foto_etiqueta=r.foto_etiqueta||"";return x;}
   const o=norm2(r),x={_aba:"ruas"};SHEET_COLS.forEach(c=>x[c]=o[c]==null?"":o[c]);x.fotos=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);return x;}
 function sheetPending(){let n=0;HIST.forEach(r=>{if(r._sheet!==SHEET_URL)n++;});return n;}
@@ -474,7 +475,8 @@ function parse8022(rows){
   out.sort((a,b)=>a.k[0]-b.k[0]||a.k[1]-b.k[1]||a.k[2]-b.k[2]||a.k[3]-b.k[3]);return out.map(x=>x.l).join("\n");}
 let BASEINFO={p:null,e:null};
 function fmtWhen(ts){return ts?fmtDT(new Date(ts)).slice(0,16):"";}
-function paintBases(){if($("bq-n")){$("bq-n").textContent=C.mat.length.toLocaleString("pt-BR");$("bq-src").textContent=BASEINFO.c?"Atualizada em "+fmtWhen(BASEINFO.c.ts)+" ("+BASEINFO.c.nome+")":"Base original do formulário";
+function paintBases(){if($("bs-n")){$("bs-n").textContent=(typeof SOBRAS!=="undefined"?SOBRAS.length:0).toLocaleString("pt-BR");$("bs-src").textContent=typeof SOBINFO!=="undefined"&&SOBINFO?"Atualizada em "+fmtWhen(SOBINFO.ts)+" ("+SOBINFO.nome+")":"Nenhuma rotina carregada";}
+  if($("bq-n")){$("bq-n").textContent=C.mat.length.toLocaleString("pt-BR");$("bq-src").textContent=BASEINFO.c?"Atualizada em "+fmtWhen(BASEINFO.c.ts)+" ("+BASEINFO.c.nome+")":"Base original do formulário";
     $("br-n").textContent=ROTINA.length.toLocaleString("pt-BR");const ds=[...new Set(ROTINA.map(a=>a[0]).filter(Boolean))].sort();$("br-src").textContent=ROTINA.length?(ROTINFO&&ROTINFO.nome?ROTINFO.nome+" · ":"")+(ds.length?ds[0].split("-").reverse().join("/")+(ds.length>1?" a "+ds[ds.length-1].split("-").reverse().join("/"):""):""):"Nenhuma rotina carregada";}
   $("b286-n").textContent=P.cod.length.toLocaleString("pt-BR");$("b8022-n").textContent=E.id.length.toLocaleString("pt-BR");
   $("b286-src").textContent=BASEINFO.p?"Atualizada em "+fmtWhen(BASEINFO.p.ts)+" ("+BASEINFO.p.nome+")":"Base original do formulário";
@@ -880,10 +882,10 @@ function fxRot(){const marg=+FECH.margem||6,tit="Retorno × Rotina (8457) — Qu
 
 /* ---- tela ---- */
 const FX_TIT={ruas:"Qualidade de Ruas",retorno:"Auditoria de Retorno",rotina:"Retorno x Rotina",cargas:"Auditoria de Cargas"};
-const FX_TAB={ruas:"Ruas",retorno:"Retorno",rotina:"Retorno × Rotina",cargas:"Cargas"};
-function fxRelatorio(){return FECH.tipo==="retorno"?fxRet():FECH.tipo==="cargas"?fxCar():FECH.tipo==="rotina"?fxRot():fxRuas();}
-function renderFech(){const box=$("fech");if(!box)return;if(FECH.tipo==="rotina"||!podeVer(FECH.tipo))FECH.tipo=["ruas","retorno","cargas"].find(k=>podeVer(k))||"ruas";
-  const bar='<div class="fxbar"><div class="seg fx-tabs" role="group" aria-label="Tipo de auditoria">'+["ruas","retorno","cargas"].filter(k=>podeVer(k)).map(k=>'<button type="button" data-fx="'+k+'" aria-pressed="'+(FECH.tipo===k)+'">'+FX_TAB[k]+'</button>').join("")+'</div>'+
+const FX_TAB={ruas:"Ruas",retorno:"Retorno",rotina:"Retorno × Rotina",cargas:"Cargas",aero:"Aéreo",setores:"Setores"};FX_TIT.aero="Auditoria Aereo";FX_TIT.setores="Setores";
+function fxRelatorio(){return FECH.tipo==="setores"?fxSetores():FECH.tipo==="aero"?fxAero():FECH.tipo==="retorno"?fxRet():FECH.tipo==="cargas"?fxCar():FECH.tipo==="rotina"?fxRot():fxRuas();}
+function renderFech(){const box=$("fech");if(!box)return;if(FECH.tipo==="rotina"||(FECH.tipo==="setores"?!ehAdm():!podeVer(FECH.tipo)))FECH.tipo=["ruas","retorno","cargas","aero"].find(k=>podeVer(k))||"ruas";
+  const bar='<div class="fxbar"><div class="seg fx-tabs" role="group" aria-label="Tipo de auditoria">'+["ruas","retorno","cargas","aero","setores"].filter(k=>k==="setores"?ehAdm():podeVer(k)).map(k=>'<button type="button" data-fx="'+k+'" aria-pressed="'+(FECH.tipo===k)+'">'+FX_TAB[k]+'</button>').join("")+'</div>'+
     '<label>De <input class="in" type="date" id="fx-de" value="'+FECH.de+'"></label><label>Até <input class="in" type="date" id="fx-ate" value="'+FECH.ate+'"></label>'+
     '<button type="button" class="btn" id="fx-upd">Atualizar</button><button type="button" class="save" id="fx-pr" style="margin:0;min-height:44px;font-size:1.1rem;width:auto;padding:0 18px">Imprimir / PDF</button></div>'+
     '<p class="note" id="fx-info" style="margin:0 0 10px">'+esc(FECH.info||"")+'</p>';
@@ -948,18 +950,19 @@ function regFonte(){return typeof temPerm==="function"&&LOGIN&&temPerm("aud_adm"
 function sheetRecs(){const j=REG.rows;if(!j)return [];const B=(r,ks)=>{ks.forEach(k=>{if(k in r)r[k]=pbool(r[k]);});return r;};
   return [].concat(fxRows(j.ruas).map(r=>B(Object.assign(r,{_aba:"ruas",_sheet:1}),["Possui_NC","Erro_Produto","Prox_Vencimento","Sem_Saldo","Avaria"])),
     fxRows(j.retorno).map(r=>B(Object.assign(r,{_aba:"retorno",_sheet:1}),["Possui_NC","Prox_Vencimento"])),
-    fxRows(j.cargas).map(r=>Object.assign(r,{_aba:"cargas",_sheet:1,Possui_NC:true,Status_NC:r.Status_NC||"Aberta"}))).sort((a,b)=>b.ts-a.ts);}
+    fxRows(j.cargas).map(r=>Object.assign(r,{_aba:"cargas",_sheet:1,Possui_NC:true,Status_NC:r.Status_NC||"Aberta"})),
+    fxRows(j.aero).map(r=>Object.assign(r,{_aba:"aero",_sheet:1,Possui_NC:true,Status_NC:r.Status_NC||"Aberta"}))).sort((a,b)=>b.ts-a.ts);}
 async function carregarReg(manual){if(REG.busy)return;if(DEMO||!SHEET_URL){REG.info="A planilha só é lida pelo site, com login.";renderRecords();return;}
   if(!navigator.onLine){REG.info=REG.rows?"Sem internet: mostrando a última cópia da planilha.":"Sem internet.";renderRecords();return;}
   REG.busy=true;REG.info="Lendo a planilha Google…";renderRecords();
   try{const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"acao=fechamento&token="+encodeURIComponent((LOGIN&&LOGIN.token)||"")+"&t="+Date.now(),{cache:"no-store"});const j=await r.json();
     if(j&&j.ok&&j.ruas){REG.rows=j;REG.info="Planilha Google · atualizado "+fmtDT(new Date()).slice(0,16);if(manual)toast("Registros atualizados com a planilha.");}else REG.info=(j&&j.erro)||"Atualize o Apps Script para a versão 14.";}
   catch(e){REG.info="Sem conexão com a planilha.";}REG.busy=false;renderRecords();}
-function ncListaHTML(L,lab,tit){const ruas=L.filter(r=>(r._aba||"ruas")==="ruas").sort((a,b)=>a.ts-b.ts),ret=L.filter(r=>r._aba==="retorno").sort((a,b)=>a.ts-b.ts),car=L.filter(r=>r._aba==="cargas").sort((a,b)=>a.ts-b.ts);
+function ncListaHTML(L,lab,tit){const ruas=L.filter(r=>(r._aba||"ruas")==="ruas").sort((a,b)=>a.ts-b.ts),ret=L.filter(r=>r._aba==="retorno").sort((a,b)=>a.ts-b.ts),car=L.filter(r=>r._aba==="cargas").sort((a,b)=>a.ts-b.ts),aer=L.filter(r=>r._aba==="aero").sort((a,b)=>a.ts-b.ts);
   const oc=r=>[pbool(r.Erro_Produto)?"Lugar errado"+(r.Endereco_Correto?" (correto "+fmtAddr(r.Endereco_Correto)+")":""):"",pbool(r.Prox_Vencimento)?"Vencimento"+(r.Data_Vencimento?" "+r.Data_Vencimento:""):"",pbool(r.Sem_Saldo)?"Sem saldo":"",pbool(r.Avaria)?"Avaria"+(r.Tipo_Avaria?" ("+r.Tipo_Avaria+")":""):""].filter(Boolean).join("; ")||"Conforme";
   const dt=r=>String(r.DataHora||"").slice(0,16);const soma=(X,k)=>X.reduce((a,r)=>a+pnum(r[k]),0);
   const sec=(t,head,rows,tot)=>rows.length?'<div class="fx-c" style="margin-top:10px"><h3>'+t+' <span style="float:right;color:#64748B">'+rows.length+' registro'+(rows.length===1?'':'s')+(tot?' · '+tot:'')+'</span></h3>'+fxTable(head,rows)+'</div>':'';
-  const k=[];if(ruas.length)k.push({t:"Ruas",v:ruas.length,c:"#DC2626",s:BRL0(soma(ruas,"Valor_Divergencia"))});if(ret.length)k.push({t:"Retorno",v:ret.length,c:"#DC2626",s:BRL0(soma(ret,"Valor_Divergencia"))});if(car.length)k.push({t:"Cargas",v:car.length,c:"#DC2626",s:BRL0(soma(car,"Valor_Total"))});k.push({t:"Total",v:L.length,c:"#0F172A"});
+  const k=[];if(ruas.length)k.push({t:"Ruas",v:ruas.length,c:"#DC2626",s:BRL0(soma(ruas,"Valor_Divergencia"))});if(ret.length)k.push({t:"Retorno",v:ret.length,c:"#DC2626",s:BRL0(soma(ret,"Valor_Divergencia"))});if(car.length)k.push({t:"Cargas",v:car.length,c:"#DC2626",s:BRL0(soma(car,"Valor_Total"))});if(aer.length)k.push({t:"Aéreo",v:aer.length,c:"#DC2626",s:BRL0(soma(aer,"Vlr. Total"))});k.push({t:"Total",v:L.length,c:"#0F172A"});
   return '<div class="fx-h"><div><h1>'+esc(tit)+'</h1><p>Período: <b>'+esc(lab)+'</b></p></div><div class="r">Gerado: <b>'+fmtDT(new Date())+'</b><br>Por: <b>'+esc(nomeAud())+'</b></div></div>'+fxKpis(k)+
     sec("Auditoria de ruas",[{t:"Data"},{t:"Endereço"},{t:"Item"},{t:"Ocorrência"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Repositor"},{t:"Auditor"},{t:"Status"}],
       ruas.map(r=>[dt(r),'<b>'+esc(fmtAddr(r.Endereco))+'</b>',esc((r.Produto||"")+(r.Descricao_Produto?" – "+String(r.Descricao_Produto).slice(0,30):"")),esc(oc(r)),pnum(r.Qtd_Divergencia_Un),BRL0(pnum(r.Valor_Divergencia)),esc(curto(r.Nome_Colaborador_NC||"")),esc(curto(r.Nome_Auditor||"")),esc(r.Status_NC||"")]),BRL0(soma(ruas,"Valor_Divergencia")))+
@@ -967,6 +970,8 @@ function ncListaHTML(L,lab,tit){const ruas=L.filter(r=>(r._aba||"ruas")==="ruas"
       ret.map(r=>{const d=pnum(r.Divergencia_Un);return [dt(r),esc(unz(r.Rua)),esc(r.Numero_OS||""),esc(r.Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),pnum(r.Qtd_Etiqueta),pnum(r.Qtd_Fisico),(d>0?"+":"")+d,BRL0(pnum(r.Valor_Divergencia)),esc([d?"Divergência":"",pbool(r.Prox_Vencimento)?"Vencimento":""].filter(Boolean).join("; ")||(pbool(r.Possui_NC)?"Não conforme":"Conforme")),esc(curto(r.Nome_Colaborador_NC||"")),esc(r.Status_NC||"")];}),BRL0(soma(ret,"Valor_Divergencia")))+
     sec("Auditoria de cargas",[{t:"Data"},{t:"O.S."},{t:"Box"},{t:"Item"},{t:"Motivo"},{t:"Qtd.",n:1},{t:"Valor",n:1},{t:"Causador"},{t:"Conferente"}],
       car.map(r=>[dt(r),esc(r.Numero_OS),esc(r.Box),esc(r.Codigo_Produto+" – "+String(r.Descricao_Produto||"").slice(0,30)),esc(r.Motivo),pnum(r.Quantidade),BRL0(pnum(r.Valor_Total)),esc((r.Causador?r.Causador+": ":"")+curto(r.Nome_Causador||"")),esc(curto(r.Nome_Conferente||""))]),BRL0(soma(car,"Valor_Total")))+
+    sec("Auditoria aéreo",[{t:"Data"},{t:"Operador"},{t:"Código"},{t:"Descrição"},{t:"Rua"},{t:"O.S."},{t:"Tipo"},{t:"Qtd.",n:1},{t:"Vlr. total",n:1}],
+      aer.map(r=>[dt(r),esc(curto(r.Operador||"")),esc(r["Código"]),esc(String(r["Descrição"]||"").slice(0,30)),esc(r.Rua),esc(r["O.S"]),esc(r["Tipo de O.S"]),pnum(r.Quantidade),BRL0(pnum(r["Vlr. Total"]))]),BRL0(soma(aer,"Vlr. Total")))+
     '<div class="fx-f"><span>'+esc(tit)+' · '+esc(lab)+'</span><span>Santa Therezinha</span></div>';}
 function imprimirLista(){const L=filtered();if(!L.length){toast("Nada para imprimir com estes filtros.");return;}const per=regPeriodo();
   const tp=$("f-tipo").value,tit=tp==="nc"?"Não conformidades":tp==="ok"?"Lançamentos conformes":"Registros de auditoria";const fonte=regFonte()==="planilha"?" (planilha)":"";
@@ -992,6 +997,8 @@ function docsOriginais(lista,base){const docs=[],feitos=new Set();const asc=list
     if(aba==="ruas"){if(r.ID_Sessao){if(feitos.has("s"+r.ID_Sessao))return;feitos.add("s"+r.ID_Sessao);const L=doGrupo(r,"ruas");docs.push({html:sessDocHTML(sessaoDe(r,L),L.slice().reverse()),multi:true});}
       else if(pbool(r.Possui_NC))docs.push({html:docHTML(r),multi:false});}
     else if(aba==="retorno"){const k="r"+(r.ID_Sessao||r.ID_Auditoria);if(feitos.has(k))return;feitos.add(k);const L=r.ID_Sessao?doGrupo(r,"retorno"):[r];docs.push({html:retDocHTML(sessaoDe(r,L),L),multi:true});}
+    else if(aba==="aero"){const k="a"+(r.Matricula_Operador||r.Operador)+"|"+String(r.DataHora||r.Data||"").slice(0,10);if(feitos.has(k))return;feitos.add(k);
+      const L=base.filter(x=>x._aba==="aero"&&(x.Matricula_Operador||x.Operador)===(r.Matricula_Operador||r.Operador)&&String(x.DataHora||x.Data||"").slice(0,10)===String(r.DataHora||r.Data||"").slice(0,10));docs.push({html:aerDocHTML(L),multi:true});}
     else if(aba==="cargas"){const k="c"+(r.ID_Sessao||r.Numero_OS);if(feitos.has(k))return;feitos.add(k);const L=base.filter(x=>x._aba==="cargas"&&(r.ID_Sessao?x.ID_Sessao===r.ID_Sessao:x.Numero_OS===r.Numero_OS)).sort((a,b)=>a.ts-b.ts);if(L.some(x=>x.Causador==="Conferente"))docs.push({html:carDocHTML(sessaoDe(r,L),L),multi:true});}});
   return docs;}
 async function makePdfLista(docs){if(!window.html2canvas)await loadScript(H2C);if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(JSPDF);
@@ -1014,6 +1021,143 @@ function imprimirOriginais(){const L=filtered();if(!L.length){toast("Nada para i
     short:"Documentos de não conformidade – "+per.lab+" – "+docs.length+" documentos",text:"*NÃO CONFORMIDADES – DOCUMENTOS*\nPeríodo: "+per.lab+"\n"+docs.length+" documentos"});
   toast(docs.length+" documento"+(docs.length>1?"s":"")+" pronto"+(docs.length>1?"s":"")+" para imprimir.");}
 $("x-orig").onclick=imprimirOriginais;
+
+
+/* ---- Aéreo ---- */
+function fxAero(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.aero).map(r=>Object.assign(r,{_q:pnum(r.Quantidade),_v:pnum(r["Vlr. Total"])})),tit="Auditoria Aéreo (empilhadeira) — Fechamento";
+  const todas=fxRows(FECH.dados&&FECH.dados.aero);const ops={};rows.forEach(r=>{const k=r.Matricula_Operador||r.Operador;const x=ops[k]=ops[k]||{n:r.Operador||k,i:0,q:0,v:0};x.i++;x.q+=r._q;x.v+=r._v;});
+  const tipos={};rows.forEach(r=>{const k=String(r["Tipo de O.S"]||"—");tipos[k]=(tipos[k]||0)+1;});const ruas={};rows.forEach(r=>{const k=unz(r.Rua)||"—";const x=ruas[k]=ruas[k]||{i:0,v:0};x.i++;x.v+=r._v;});
+  const aud={};rows.forEach(r=>{const k=r.Nome_Auditor||"—";aud[k]=(aud[k]||0)+1;});const itens={};rows.forEach(r=>{const k=r["Código"];const x=itens[k]=itens[k]||{d:r["Descrição"],i:0,q:0,v:0};x.i++;x.q+=r._q;x.v+=r._v;});
+  const tot=rows.reduce((a,r)=>a+r._v,0),un=rows.reduce((a,r)=>a+r._q,0);const cores=["#2563EB","#7C3AED","#0EA5E9","#F97316","#16A34A","#CA8A04","#DC2626","#64748B"];
+  const porD={};todas.forEach(r=>{const k=fxDiaKey(r.ts);porD[k]=(porD[k]||0)+1;});const linha=diasCorridos(30).map(d=>{const v=porD[fxDiaKey(d.getTime())]||0;return {l:fxDia(d.getTime()),v,txt:v?String(v):""};});
+  return fxHead(tit,rows.length)+
+    fxKpis([{t:"Não conformidades",v:rows.length,c:"#DC2626"},{t:"Operadores",v:Object.keys(ops).length,c:"#0F172A"},{t:"O.S. auditadas",v:new Set(rows.map(r=>r["O.S"])).size},
+      {t:"Unidades",v:un.toLocaleString("pt-BR"),c:"#0F172A"},{t:"Valor total",v:BRL0(tot),c:"#B45309",s:"qtd. × Vl. ult. entrada (286)"}])+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Operadores com mais não conformidades",fxBars(Object.values(ops).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,10).map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+BRL0(x.v),c:"#DC2626"}))))+
+      fxCard("Itens com mais ocorrências",fxTable([{t:"Código"},{t:"Descrição"},{t:"Ocorr.",n:1},{t:"Un",n:1},{t:"Valor",n:1}],Object.entries(itens).sort((a,b)=>b[1].i-a[1].i||b[1].v-a[1].v).slice(0,7).map(([k,x])=>[esc(k),esc(String(x.d||"").slice(0,30)),x.i,x.q,BRL0(x.v)])))+'</div>'+
+    '<div class="fx-col">'+fxCard("Tipo de O.S.",fxDonut(Object.entries(tipos).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>({l:"Tipo "+k,v,c:cores[i%cores.length]}))))+
+      fxCard("Valor por operador",fxBars(Object.values(ops).sort((a,b)=>b.v-a.v).slice(0,8).map(x=>({l:curto(x.n),v:x.v,txt:BRL0(x.v),c:"#B45309"}))))+'</div></div>'+
+    '<div class="fx-g3" style="margin-top:10px">'+fxCard("Ruas com mais ocorrências",fxBars(Object.entries(ruas).sort((a,b)=>b[1].i-a[1].i).slice(0,6).map(([k,x])=>({l:"Rua "+k,v:x.i,txt:x.i+" · "+BRL0(x.v),c:"#0EA5E9"}))))+
+      fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))))+
+      fxCard("Resumo",'<p class="fx-e" style="color:#0F172A">Encarregado do setor: <b>'+ENC_AERO.nome+'</b>.<br>Cada lançamento é uma não conformidade do operador.</p>')+'</div>'+
+    fxFull("Não conformidades lançadas por dia — últimos 30 dias (não depende do filtro)",fxLine(linha,"#DC2626"))+fxFoot("Auditoria Aéreo");}
+
+/* ---- Setores ---- */
+function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&FECH.dados.sobras.length)?FECH.dados.sobras:SOBRAS;
+  return src.map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10])})).filter(o=>o.ts);}
+function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const per=r=>r.ts>=de&&r.ts<ate;
+  const ruas=fxNoPeriodo(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),ret=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),car=fxNoPeriodo(FECH.dados&&FECH.dados.cargas),
+    aer=fxNoPeriodo(FECH.dados&&FECH.dados.aero),sobAll=sobrasRows(),sob=sobAll.filter(per);
+  const S=[{k:"rep",l:"Reposição — ruas",c:"#16A34A",n:ruas.length,v:ruas.reduce((a,r)=>a+pnum(r.Valor_Divergencia),0),rows:ruas},
+    {k:"ret",l:"Reposição — retorno",c:"#0E7490",n:ret.length,v:ret.reduce((a,r)=>a+Math.abs(pnum(r.Valor_Divergencia)),0),rows:ret},
+    {k:"conf",l:"Cargas — conferência",c:"#0EA5E9",n:car.filter(r=>r.Causador!=="Separador").length,v:car.filter(r=>r.Causador!=="Separador").reduce((a,r)=>a+pnum(r.Valor_Total),0),rows:car.filter(r=>r.Causador!=="Separador")},
+    {k:"sep",l:"Separação — cargas + sobras 8074",c:"#7C3AED",n:car.filter(r=>r.Causador==="Separador").length+sob.length,v:car.filter(r=>r.Causador==="Separador").reduce((a,r)=>a+pnum(r.Valor_Total),0)+sob.reduce((a,o)=>a+o.v,0),rows:car.filter(r=>r.Causador==="Separador").concat(sob)},
+    {k:"aer",l:"Aéreo — empilhadeira",c:"#DC2626",n:aer.length,v:aer.reduce((a,r)=>a+pnum(r["Vlr. Total"]),0),rows:aer}];
+  const tot=S.reduce((a,s)=>a+s.n,0),totV=S.reduce((a,s)=>a+s.v,0),pior=S.slice().sort((a,b)=>b.n-a.n)[0];
+  const pessoas={};const add=(n,set,v)=>{if(!n)return;const x=pessoas[n+"|"+set]=pessoas[n+"|"+set]||{n,set,i:0,v:0};x.i++;x.v+=v;};
+  ruas.forEach(r=>add(r.Nome_Colaborador_NC,"Reposição",pnum(r.Valor_Divergencia)));ret.forEach(r=>add(r.Nome_Colaborador_NC,"Retorno",Math.abs(pnum(r.Valor_Divergencia))));
+  car.forEach(r=>add(r.Nome_Causador||r.Nome_Conferente,r.Causador==="Separador"?"Separação":"Conferência",pnum(r.Valor_Total)));sob.forEach(o=>add(o.sep,"Separação (8074)",o.v));aer.forEach(r=>add(r.Operador,"Aéreo",pnum(r["Vlr. Total"])));
+  const dias=diasCorridos(30),key=d=>fxDiaKey(d.getTime());const serie=s=>{const m={};(s.k==="sep"?car.filter(r=>r.Causador==="Separador").map(r=>r.ts).concat(sobAll.map(o=>o.ts)):
+      s.k==="conf"?fxRows(FECH.dados&&FECH.dados.cargas).filter(r=>r.Causador!=="Separador").map(r=>r.ts):s.k==="aer"?fxRows(FECH.dados&&FECH.dados.aero).map(r=>r.ts):
+      s.k==="rep"?fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)).map(r=>r.ts):fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)).map(r=>r.ts)).forEach(t=>{const k=fxDiaKey(t);m[k]=(m[k]||0)+1;});
+    return dias.map(d=>m[key(d)]||0);};
+  const W=1040,H=190,pl=34,pr=10,pt=14,pb=24,series=S.map(s=>({s,v:serie(s)})),mx=Math.max(1,...series.flatMap(x=>x.v));const x=i=>pl+i*(W-pl-pr)/(dias.length-1),y=v=>pt+(1-v/mx)*(H-pt-pb);
+  const multi='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">'+[0,.5,1].map(g=>'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(mx*g)+'" y2="'+y(mx*g)+'" stroke="#E2E8F0"/><text x="'+(pl-5)+'" y="'+(y(mx*g)+3)+'" font-size="9" text-anchor="end" fill="#64748B">'+Math.round(mx*g)+'</text>').join("")+
+    series.map(({s,v})=>'<path d="'+v.map((n,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(n).toFixed(1)).join(" ")+'" fill="none" stroke="'+s.c+'" stroke-width="2"/>').join("")+
+    dias.map((d,i)=>i%2===0||i===dias.length-1?'<text x="'+x(i).toFixed(1)+'" y="'+(H-7)+'" font-size="9" text-anchor="middle" fill="#64748B">'+fxDia(d.getTime())+'</text>':'').join("")+'</svg>'+
+    '<div class="fx-leg" style="margin-top:4px">'+S.map(s=>'<span style="border-color:'+s.c+';color:'+s.c+'">● '+esc(s.l)+'</span>').join("")+'</div>';
+  return fxHead(tit,tot)+
+    fxKpis(S.map(s=>({t:s.l,v:s.n,c:s.c,s:BRL0(s.v)+(tot?" · "+Math.round(s.n/tot*100)+"%":"")})).concat([{t:"Total de NCs",v:tot,c:"#0F172A",s:BRL0(totV)}]))+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Setores com mais não conformidades",fxBars(S.slice().sort((a,b)=>b.n-a.n).map(s=>({l:s.l,v:s.n,txt:s.n+" NC",c:s.c}))))+
+      fxCard("Detalhe por setor",fxTable([{t:"Setor"},{t:"NCs",n:1},{t:"% do total",n:1},{t:"Valor",n:1},{t:"Origem"}],S.map(s=>['<b style="color:'+s.c+'">'+esc(s.l)+'</b>',s.n,tot?pc0(s.n/tot):"—",BRL0(s.v),
+        esc({rep:"Auditoria de ruas",ret:"Auditoria de retorno",conf:"Cargas — causador conferente",sep:(car.filter(r=>r.Causador==="Separador").length)+" cargas (separador) + "+sob.length+" sobras da rotina 8074",aer:"Auditoria aéreo"}[s.k])])))+'</div>'+
+    '<div class="fx-col">'+fxCard("Participação no total",fxDonut(S.map(s=>({l:s.l,v:s.n,c:s.c}))))+
+      fxCard("Valor por setor",fxBars(S.slice().sort((a,b)=>b.v-a.v).map(s=>({l:s.l,v:s.v,txt:BRL0(s.v),c:s.c}))))+'</div></div>'+
+    '<div class="fx-g3" style="margin-top:10px">'+fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,8).map(x=>({l:curto(x.n)+" · "+x.set,v:x.i,txt:String(x.i),c:"#DC2626"}))))+
+      fxCard("Sobras de separação (8074) — separadores",fxBars((function(){const o={};sob.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,8);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+x.q+" un",c:"#7C3AED"}))))+
+      fxCard("Setor com mais NCs",pior&&pior.n?'<p style="margin:4px 0;font-size:22px;font-weight:700;color:'+pior.c+'">'+esc(pior.l)+'</p><p class="fx-e" style="color:#0F172A">'+pior.n+' não conformidades ('+(tot?pc0(pior.n/tot):"")+' do total) · '+BRL0(pior.v)+'</p>':'<p class="fx-e">Sem NCs no período.</p>')+'</div>'+
+    fxFull("Não conformidades por dia e setor — últimos 30 dias (não depende do filtro)",multi)+fxFoot("Setores auditados");}
+
+// auditoria aéreo (operadores de empilhadeira)
+const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
+const AER_COLS=["ID_Auditoria","Data","DataHora","Matricula_Operador","Operador","Código","Descrição","Rua","O.S","Tipo de O.S","Quantidade","Vl_Ult_Entrada","Vlr. Total","Observacao","Matricula_Auditor","Nome_Auditor","Status_NC"];
+function searchOper(q){const L=searchColab(q);return L.sort((a,b)=>(/EMPILHADEIRA/.test(b.s)?1:0)-(/EMPILHADEIRA/.test(a.s)?1:0));}
+const AE={prod:null};
+const aOp=picker($("a-op"),{ph:"Matrícula ou nome do operador",search:searchOper,describe:descColab,novo:true,onPick:k=>{if(k!=null)store.set("audcd_aero_op",C.mat[k]);paintAE();}});
+const aProd=picker($("a-prod"),{ph:"Código ou descrição do item",search:searchProd,describe:descProd,onPick:k=>{AE.prod=k;paintAE();if(k!=null)setTimeout(()=>QW.a&&QW.a.focus(),50);}});
+document.querySelectorAll("[data-aq]").forEach(b=>b.addEventListener("click",()=>{const i=$("a-qtd");i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.aq);paintAE();}));
+$("a-qtd").addEventListener("input",paintAE);
+function aeQ(){const v=String($("a-qtd").value).trim();return v===""?0:Math.max(0,parseInt(v,10)||0);}
+function paintAE(){if(!$("a-valor"))return;if(window.QW&&QW.a)QW.a.refresh();const vl=AE.prod!=null?P.vl[AE.prod]:0,q=aeQ();
+  $("a-valor").textContent=BRL.format(q*vl);$("a-calc").textContent=q+" un × "+BRL.format(vl)+" (Vl. ult. entrada 286)";$("a-data").textContent=fmtDT(new Date()).slice(0,10);listaAE();}
+function aeHoje(){const t0=new Date();t0.setHours(0,0,0,0);return allRecs().filter(r=>r._aba==="aero"&&r.ts>=t0.getTime()&&r.Matricula_Auditor===auditor).sort((a,b)=>b.ts-a.ts);}
+function listaAE(){const L=aeHoje();const g={};L.forEach(r=>{(g[r.Matricula_Operador]=g[r.Matricula_Operador]||[]).push(r);});
+  $("a-list").innerHTML=L.length?'<div class="block"><h3>Lançamentos de hoje <small>'+L.length+'</small></h3>'+
+    Object.entries(g).map(([m,rs])=>'<button type="button" class="save" data-anc="'+esc(m)+'" style="margin:4px 0 8px;min-height:46px;font-size:1.05rem">Imprimir NC – '+esc(curto(rs[0].Operador))+' ('+rs.length+')</button>').join("")+
+    L.map(r=>'<div class="li"><div><div class="d"><b>'+esc(r["Código"])+'</b> – '+esc(r["Descrição"])+'</div><div class="tags"><span class="tag nc">'+esc(curto(r.Operador))+'</span><span class="tag">Rua '+esc(r.Rua)+'</span><span class="tag">O.S. '+esc(r["O.S"])+'</span><span class="tag">Tipo '+esc(r["Tipo de O.S"])+'</span></div></div>'+
+      '<div><div class="v">'+esc(r.Quantidade)+' un<br>'+BRL.format(+r["Vlr. Total"]||0)+'</div><div class="act"><button type="button" class="btn sm" data-ax="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>').join("")+'</div>':"";
+  $("a-list").querySelectorAll("[data-anc]").forEach(b=>b.onclick=()=>{const rs=L.filter(r=>r.Matricula_Operador===b.dataset.anc);openAerDoc(rs);});
+  $("a-list").querySelectorAll("[data-ax]").forEach(b=>b.onclick=()=>delRec(b.dataset.ax).then(()=>paintAE()));}
+function resetAE(){aProd.clear();AE.prod=null;["a-rua","a-os","a-tipo","a-obs"].forEach(i=>$(i).value="");$("a-qtd").value="";if(window.QW&&QW.a)QW.a.reset();document.querySelectorAll("#v-aero .field.bad").forEach(f=>setErr(f.id,""));paintAE();}
+$("a-save").addEventListener("click",async()=>{
+  if(!auditor){toast("Faça login primeiro.");return;}
+  const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const q=aeQ(),rua=$("a-rua").value.replace(/\D/g,""),os=$("a-os").value.replace(/\D/g,""),tipo=$("a-tipo").value.trim();
+  chk(aOp.value==null,"a-op-f","Informe o operador.");chk(AE.prod==null,"a-prod-f","Informe o item.");chk(!rua,"a-rua-f","Informe a rua.");chk(!os,"a-os-f","Informe a O.S.");
+  chk(!tipo,"a-tipo-f","Informe o tipo de O.S.");chk(!(q>0),"a-qtd-f","Informe a quantidade encontrada.");
+  if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
+  const now=new Date(),k=AE.prod,vl=P.vl[k],oi=aOp.value;
+  const rec={_aba:"aero",ID_Auditoria:newId("AE"),Data:fmtDT(now).slice(0,10),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Operador:C.mat[oi],Operador:C.nome[oi],
+    "Código":P.cod[k],"Descrição":P.desc[k],Rua:String(+rua),"O.S":os,"Tipo de O.S":tipo,Quantidade:q,Vl_Ult_Entrada:vl,"Vlr. Total":Math.round(q*vl*100)/100,
+    Observacao:$("a-obs").value.trim(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),Possui_NC:true,Status_NC:"Aberta"};
+  $("a-save").disabled=true;const ok=await saveRec(rec);$("a-save").disabled=false;resetAE();window.scrollTo(0,0);
+  toast((ok||dbState==="off"?"Lançamento salvo":"Salvo neste aparelho, envio pendente")+" – "+BRL.format(rec["Vlr. Total"])+".");aProd.focus();});
+function aerDocHTML(L){L=L.slice().sort((a,b)=>a.ts-b.ts);const f=L[0],tot=L.reduce((a,r)=>a+(+r["Vlr. Total"]||pnum(r["Vlr. Total"])||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||pnum(r.Quantidade)||0),0);
+  const row=(k,v)=>'<tr><td class="k">'+k+'</td><td>'+(v===""||v==null?"–":esc(v))+'</td></tr>';const obs=L.filter(r=>r.Observacao).map(r=>r["Código"]+": "+r.Observacao);
+  return '<div class="pd"><div class="pd-h"><img src="'+LOGO_BLUE+'" alt="Santa Therezinha"><div class="r"><h1>Não conformidade – Operação aéreo</h1><p>Operador de empilhadeira · '+esc(f.Data||String(f.DataHora||"").slice(0,10))+'</p></div></div>'+
+   '<h2>Identificação</h2><table>'+row("Data",f.Data||String(f.DataHora||"").slice(0,10))+row("Operador",(f.Operador||"")+" – matrícula "+(f.Matricula_Operador||""))+row("Auditor",(f.Nome_Auditor||"")+" – matrícula "+(f.Matricula_Auditor||""))+'</table>'+
+   '<div class="sum"><div><b>'+L.length+'</b><span>ocorrências</span></div><div><b>'+un+'</b><span>unidades</span></div><div><b>'+BRL.format(tot)+'</b><span>valor total</span></div><div><b>'+[...new Set(L.map(r=>r["O.S"]))].length+'</b><span>O.S.</span></div></div>'+
+   '<h2>Ocorrências</h2><table class="lt"><thead><tr><th>Código</th><th>Descrição</th><th>Rua</th><th>O.S.</th><th>Tipo</th><th>Qtd.</th><th>Vl. un.</th><th>Vlr. total</th></tr></thead><tbody>'+
+   L.map(r=>{const q=+r.Quantidade||pnum(r.Quantidade)||0,v=+r["Vlr. Total"]||pnum(r["Vlr. Total"])||0;return '<tr><td>'+esc(r["Código"])+'</td><td>'+esc(r["Descrição"])+'</td><td class="n">'+esc(r.Rua)+'</td><td class="n">'+esc(r["O.S"])+'</td><td class="n">'+esc(r["Tipo de O.S"])+'</td><td class="n">'+q+'</td><td class="n">'+BRL.format(+r.Vl_Ult_Entrada||(q?v/q:0))+'</td><td class="n">'+BRL.format(v)+'</td></tr>';}).join("")+
+   '</tbody><tfoot><tr><td colspan="5">Total</td><td class="n">'+un+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
+   '<p class="decl" style="margin-top:6px">Valor total = quantidade encontrada × Vl. ult. entrada da base 286.</p>'+
+   (obs.length?'<h2>Observações</h2><div class="obs">'+esc(obs.join("\n"))+'</div>':'')+
+   '<p class="decl">Declaro ciência das não conformidades registradas na auditoria da operação aéreo.</p>'+
+   '<div class="sg"><div><b>Operador</b>'+esc(f.Operador||"")+'<small>Matrícula '+esc(f.Matricula_Operador||"")+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Auditor</b>'+esc(f.Nome_Auditor||"")+'<small>Matrícula '+esc(f.Matricula_Auditor||"")+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Encarregado do setor</b>'+ENC_AERO.nome+'<small>Matrícula '+ENC_AERO.mat+'</small><small>Data: ___/___/______</small></div></div></div>';}
+function openAerDoc(L){if(!L.length)return;const f=L[0],tot=L.reduce((a,r)=>a+(+r["Vlr. Total"]||0),0);
+  openDoc({html:aerDocHTML(L),multi:true,name:"NC_Aereo_"+String(f.Operador||"").split(" ")[0]+"_"+todayISO()+".pdf",title:"NC aéreo – "+curto(f.Operador),
+    short:"NC aéreo – "+curto(f.Operador)+" – "+BRL.format(tot),text:["*NÃO CONFORMIDADE – AÉREO*","Operador: "+f.Operador+" ("+f.Matricula_Operador+")",L.length+" ocorrências","*Valor total: "+BRL.format(tot)+"*"].join("\n")});}
+function cardAer(r){const fl=(k)=>r[k]==null?"":r[k];
+  return '<details class="rec nc"><summary><div class="top"><span>'+esc(r.DataHora||r.Data)+' · '+esc(r.Nome_Auditor)+'</span><span>'+esc(r.Status_NC||"Aberta")+'</span></div>'+
+   '<div class="addr">'+esc(curto(r.Operador||""))+' · Rua '+esc(fl("Rua"))+'</div><div class="desc">'+esc(fl("Código"))+' – '+esc(fl("Descrição"))+'</div>'+
+   '<div class="tags"><span class="tag nc">Aéreo</span><span class="tag">O.S. '+esc(fl("O.S"))+'</span><span class="tag">Tipo '+esc(fl("Tipo de O.S"))+'</span><span class="tag">'+esc(fl("Quantidade"))+' un</span><span class="tag nc">'+BRL.format(pnum(r["Vlr. Total"]))+'</span></div></summary>'+
+   (r.Observacao?'<dl><dt>Obs.</dt><dd>'+esc(r.Observacao)+'</dd></dl>':'')+'</details>';}
+const aOpIni=store.get("audcd_aero_op",null);if(aOpIni&&cIdx.has(aOpIni))aOp.set(cIdx.get(aOpIni));
+
+// sobras de separação (rotina 8074)
+let SOBRAS=[],SOBINFO=null;
+function parse8074WB(wb){for(const sn of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""});
+    const H=findHeader(rows,[x=>x==="MOTIVO",x=>x==="CODPROD",x=>x.startsWith("OSCARREG")||x==="OS"]);if(!H)continue;const ix=f=>H.h.findIndex(f);
+    const iD=ix(x=>x==="DATA"),iM=ix(x=>x==="MOTIVO"),iO=ix(x=>x.startsWith("OSCARREG")||x==="OS"),iC=ix(x=>x==="CODPROD"),iDe=ix(x=>x==="DESCRICAO"),iA=ix(x=>x==="ACAO"),iCf=ix(x=>x==="CONFERENTE"),iS=ix(x=>x==="SEPARADOR"),iOp=ix(x=>x==="OPERACAO");
+    const out=[],seen=new Set();
+    for(let r=H.i+1;r<rows.length;r++){const row=rows[r];if(!/SUPERIOR/i.test(String(row[iM])))continue;
+      const d=row[iD] instanceof Date?row[iD]:null;const ds=d?(isoDe(d)+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())):String(row[iD]||"").trim();
+      const acao=String(row[iA]||"");const m=acao.match(/(?:QT|Quantidade)\s*:?\s*(\d+)/i);const qt=m?+m[1]:0;
+      const sp=v=>{const s=String(v||"").trim();const mm=s.match(/^(\d+)\s*-\s*(.+)$/);return mm?[mm[1],mm[2].trim()]:["",s==="-"?"":s];};
+      const cf=sp(row[iCf]),se=sp(row[iS]),os=String(row[iO]).trim().replace(/\.0+$/,""),cod=String(row[iC]).trim().replace(/\.0+$/,"");
+      const k=[ds,os,cod,qt,se[0]].join("|");if(seen.has(k))continue;seen.add(k);
+      const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
+      out.push([ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,k]);}
+    if(out.length)return out;}
+  throw new Error("Não encontrei as colunas MOTIVO, CODPROD e O.S/Carreg. (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
+$("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
+  try{const wb=await lerLivro(file);const L=parse8074WB(wb);const m=new Map(SOBRAS.map(a=>[a[11],a]));L.forEach(a=>m.set(a[11],a));SOBRAS=[...m.values()];SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
+    msg.textContent=L.length+" sobras (quantidade superior) lidas. Enviando à planilha…";paintBases();
+    let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Sobras guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
+    msg.textContent=L.length+" sobras lidas"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+").":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+  catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
+IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=c.rows;SOBINFO=c.info;}}).catch(()=>{});
 
 
 // auditoria de retorno (por rua, vários lançamentos)
@@ -1270,7 +1414,7 @@ function qtdCxUn(id,prodFn){const inp=$(id);if(!inp)return null;const st=inp.clo
   w.querySelectorAll("button[data-d]").forEach(b=>b.onclick=()=>{const i=b.dataset.w==="cx"?cx:un;if(i.disabled)return;i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.d);sync();});
   return {reset(){cx.value="";un.value="";inp.value="";paintT();},refresh(){if(cx.value!==""||un.value!=="")sync();else paintT();},focus(){(cx.disabled?un:cx).focus();},
     resumo(){const c=val(cx)||0,u=val(un)||0,f=fatorCx(prodFn());return f&&c?c+" cx"+(u?" + "+u+" un":""):"";}};}
-QW.r=qtdCxUn("r-qtd",()=>R.prod);QW.qe=qtdCxUn("t-qe",()=>RT.prod);QW.qf=qtdCxUn("t-qf",()=>RT.prod);QW.g=qtdCxUn("g-qtd",()=>CG.prod);
+QW.r=qtdCxUn("r-qtd",()=>R.prod);QW.a=qtdCxUn("a-qtd",()=>AE.prod);QW.qe=qtdCxUn("t-qe",()=>RT.prod);QW.qf=qtdCxUn("t-qf",()=>RT.prod);QW.g=qtdCxUn("g-qtd",()=>CG.prod);
 Object.values(QW).forEach(q=>q&&q.reset());
 
 
