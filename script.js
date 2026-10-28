@@ -1032,12 +1032,11 @@ function fxAero(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.aero).map(r=>Obj
     fxKpis([{t:"Não conformidades",v:rows.length,c:"#DC2626",s:Object.keys(porD).length+" dia"+(Object.keys(porD).length===1?"":"s")+" com NC"},{t:"Operadores com NC",v:nOp,c:"#0F172A",s:nOp?(rows.length/nOp).toFixed(1).replace(".",",")+" NC por operador":""},
       {t:"O.S. auditadas",v:new Set(rows.map(r=>r["O.S"])).size},{t:"Valor médio por NC",v:BRL0(rows.length?tot/rows.length:0),c:"#B45309",s:maior?"maior: "+BRL0(maior._v)+" · "+curto(maior.Operador||""):""},
       {t:"Valor total",v:BRL0(tot),c:"#B45309",s:opTop?"mais NCs: "+curto(opTop.n)+" ("+opTop.i+")":""}],true)+
-    fxFull("Lançamentos de não conformidade por dia (somente dias com auditoria)",fxLine(linha,"#DC2626"))+
     '<div class="fx-g" style="margin-top:10px"><div class="fx-col">'+fxCard("Auditorias por operador (quantidade de NCs)",fxCols(Object.values(ops).sort((a,b)=>b.i-a.i).slice(0,10).map(x=>({l:curto(x.n),v:x.i,txt:String(x.i),c:"#DC2626"}))))+
       fxCard("Itens com mais ocorrências",fxTable([{t:"Código"},{t:"Descrição"},{t:"Ocorr.",n:1},{t:"Un",n:1},{t:"Valor",n:1}],Object.entries(itens).sort((a,b)=>b[1].i-a[1].i||b[1].v-a[1].v).slice(0,6).map(([k,x])=>[esc(k),esc(String(x.d||"").slice(0,30)),x.i,x.q,BRL0(x.v)])))+'</div>'+
     '<div class="fx-col">'+fxCard("Ruas com mais ocorrências",fxCols(Object.entries(ruas).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({l:"Rua "+k,v,txt:String(v),c:"#0EA5E9"}))).replace('height:140px','height:120px'))+
       '<div class="fx-g2">'+fxCard("Tipo de O.S.",fxDonut(Object.entries(tipos).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>({l:"Tipo "+k,v,c:cores[i%cores.length]}))))+
-      fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))))+'</div></div></div>'+fxFoot("Auditoria Aéreo");}
+      fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))))+'</div></div></div>'+fxFull("Lançamentos de não conformidade por dia (somente dias com auditoria)",fxLine(linha,"#DC2626"))+fxFoot("Auditoria Aéreo");}
 
 /* ---- Setores ---- */
 function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&FECH.dados.sobras.length)?FECH.dados.sobras:SOBRAS;
