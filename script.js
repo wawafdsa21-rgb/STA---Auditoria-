@@ -1051,11 +1051,11 @@ function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),tot=L.reduce((a,s)=>
     '<path d="'+pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ")+'" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-dasharray="4 3"/>'+pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#0F172A"/><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-6).toFixed(1)+'" font-size="9" text-anchor="middle" fill="#0F172A">'+Math.round(p[2]*100)+'%</text>').join("")+'</svg>'+
     '<p class="fx-e" style="margin-top:2px">Barras = NCs por setor (maior para menor). Linha = % acumulado: mostra quantos setores concentram a maior parte das NCs.</p>';}
 function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const len=Math.max(864e5,(isFinite(ate)?ate:Date.now())-de),pde=de-len;
-  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows().filter(o=>o.tipo==="Sobra"),sobA=ncs8074(s8);
+  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows().filter(o=>o.tipo==="Sobra"),sobA=s8;
   const def=[{k:"rep",l:"Reposição — ruas",cur:"Repos. ruas",c:"#16A34A",rows:ruasA,val:r=>pnum(r.Valor_Divergencia),pes:r=>r.Nome_Colaborador_NC},
     {k:"ret",l:"Reposição — retorno",cur:"Repos. retorno",c:"#0E7490",rows:retA,val:r=>Math.abs(pnum(r.Valor_Divergencia)),pes:r=>r.Nome_Colaborador_NC},
     {k:"conf",l:"Cargas — conferência",cur:"Conferência",c:"#0EA5E9",rows:carA.filter(r=>r.Causador!=="Separador"),val:r=>pnum(r.Valor_Total),pes:r=>r.Nome_Causador||r.Nome_Conferente},
-    {k:"sep",l:"Separação — cargas + NCs 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Nome_Causador||r.sep},
+    {k:"sep",l:"Separação — cargas + sobras 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Nome_Causador||r.sep},
     {k:"aer",l:"Aéreo — operador",cur:"Aéreo",c:"#DC2626",rows:aerA,val:r=>pnum(r["Vlr. Total"]),pes:r=>r.Operador}];
   const S=def.map(d=>{const cur=d.rows.filter(r=>r.ts>=de&&r.ts<ate),ant=d.rows.filter(r=>r.ts>=pde&&r.ts<de);const v=cur.reduce((a,r)=>a+d.val(r),0);
     const p={};cur.forEach(r=>{const n=d.pes(r);if(n)p[n]=(p[n]||0)+1;});const topP=Object.entries(p).sort((a,b)=>b[1]-a[1])[0];
@@ -1073,7 +1073,9 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
       ord.map(s=>['<b style="color:'+s.c+'">'+esc(s.l)+'</b>','<b>'+s.n+'</b>',tot?pc0(s.n/tot):"—",BRL0(s.v),BRL0(s.med),s.pessoas,esc(s.top?curto(s.top[0])+" ("+s.top[1]+")":"—"),s.ant,'<b style="color:'+varCor(s.n,s.ant)+'">'+varTxt(s.n,s.ant)+'</b>'])))+
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Valor por setor",fxBars(S.slice().sort((a,b)=>b.v-a.v).map(s=>({l:s.cur,v:s.v,txt:BRL0(s.v),c:s.c}))))+
       fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,7).map(x=>({l:curto(x.n)+" · "+x.s.cur,v:x.i,txt:String(x.i),c:x.s.c}))))+
-      fxCard("Sobras 8074 — NCs por separador",fxBars((function(){const o={};sobPer.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,7);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" NC · "+x.q+" un",c:"#7C3AED"})))+'<p class="fx-e" style="margin-top:6px">Somente quantidade superior, sem duplicatas. Uma NC por separador + O.S. com sobra.</p>')+'</div>'+fxFoot("Setores auditados");}
+      fxCard("Sobras 8074 por separador (contagem)",(function(){const o={};sobPer.forEach(s=>{const k=s.sepM||s.sep||"—";const x=o[k]=o[k]||{n:s.sep||k,i:0,q:0,os:new Set()};x.i++;x.q+=s.q;x.os.add(s.os);});
+        const L=Object.values(o).sort((a,b)=>b.i-a.i||b.q-a.q).slice(0,10);
+        return fxBars(L.map(x=>({l:curto(x.n)+" · "+x.os.size+" O.S.",v:x.i,txt:x.i+" sobra"+(x.i===1?"":"s"),c:"#7C3AED"})))+'<p class="fx-e" style="margin-top:6px">Somente quantidade superior, sem duplicatas (mesma O.S. e hora; mesmo item na O.S.). '+sobPer.length+' sobras de '+Object.keys(o).length+' separadores no período.</p>';})())+'</div>'+fxFoot("Setores auditados");}
 
 // auditoria aéreo (operadores de empilhadeira)
 const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
@@ -1158,13 +1160,13 @@ function parse8074WB(wb){for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];c
       const m=String(row[iA]||"").match(/(\d+)\s*$/);const qt=m?+m[1]:0;const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
       out.push([q.ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,ki,tipo,String(iE>=0?row[iE]:"").trim()]);}
     if(out.length){out.resumo={brutas,repHora,repItem,sobras:out.filter(a=>a[12]==="Sobra").length,faltas:out.filter(a=>a[12]==="Falta").length,
-      ncs:new Set(out.filter(a=>a[12]==="Sobra").map(a=>(a[7]||a[8])+"|"+a[1])).size};return out;}}
+      ncs:new Set(out.filter(a=>a[12]==="Sobra").map(a=>(a[7]||a[8])+"|"+a[1])).size,seps:new Set(out.map(a=>a[7]||a[8])).size};return out;}}
   throw new Error("Não encontrei as colunas DATA, MOTIVO, O.S, CODPROD e SEPARADOR (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
 $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
   try{const wb=await lerLivro(file);const L=parse8074WB(wb);SOBRAS=dedupSobras(SOBRAS.concat(L));SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
-    const R8=L.resumo;msg.textContent=R8.brutas+" linhas de quantidade superior · "+(R8.repHora+R8.repItem)+" duplicatas removidas ("+R8.repHora+" por O.S. e hora, "+R8.repItem+" por item na O.S.) · "+R8.sobras+" sobras = "+R8.ncs+" não conformidades. Enviando à planilha…";paintBases();
+    const R8=L.resumo;msg.textContent=R8.brutas+" linhas de quantidade superior · "+(R8.repHora+R8.repItem)+" duplicatas removidas ("+R8.repHora+" por O.S. e hora, "+R8.repItem+" por item na O.S.) · "+R8.sobras+" sobras de "+R8.seps+" separadores. Enviando à planilha…";paintBases();
     let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Sobras guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
-    msg.textContent=R8.sobras+" sobras sem duplicatas ("+R8.ncs+" NCs por separador e O.S.)"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+    msg.textContent=R8.sobras+" sobras sem duplicatas, de "+R8.seps+" separadores"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
 function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2])+"|"+(a[12]||"Sobra")+"|"+(a[7]||a[8]||"");if(!m.has(k))m.set(k,a);});return [...m.values()];}
 IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows.filter(a=>(a[12]||"Sobra")==="Sobra"));SOBINFO=c.info;}}).catch(()=>{});
