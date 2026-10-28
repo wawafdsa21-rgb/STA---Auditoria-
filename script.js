@@ -1043,13 +1043,11 @@ function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&F
   return dedupSobras(src).map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10]),tipo:a[12]||"Sobra"})).filter(o=>o.ts);}
 /** Uma NC por separador + O.S. com sobra (regra da Expedição). */
 function ncs8074(L){const m=new Map();L.filter(o=>o.tipo==="Sobra").sort((a,b)=>a.ts-b.ts).forEach(o=>{const k=(o.sepM||o.sep)+"|"+o.os;const x=m.get(k);if(x){x.itens++;x.q+=o.q;x.v+=o.v;}else m.set(k,{ts:o.ts,os:o.os,sep:o.sep,sepM:o.sepM,itens:1,q:o.q,v:o.v});});return [...m.values()];}
-function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),tot=L.reduce((a,s)=>a+s.n,0)||1,W=520,H=210,pl=30,pr=34,pt=16,pb=46,bw=(W-pl-pr)/L.length,mx=Math.max(1,...L.map(s=>s.n));let acc=0;
-  const pts=L.map((s,i)=>{acc+=s.n;return [pl+bw*i+bw/2,pt+(1-acc/tot)*(H-pt-pb),acc/tot];});
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">'+[0,.5,1].map(g=>'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+(pt+(1-g)*(H-pt-pb))+'" y2="'+(pt+(1-g)*(H-pt-pb))+'" stroke="#E2E8F0"/><text x="'+(W-pr+4)+'" y="'+(pt+(1-g)*(H-pt-pb)+3)+'" font-size="9" fill="#64748B">'+Math.round(g*100)+'%</text>').join("")+
-    L.map((s,i)=>{const h=s.n/mx*(H-pt-pb),x=pl+bw*i+bw*.18;return '<rect x="'+x+'" y="'+(H-pb-h)+'" width="'+(bw*.64)+'" height="'+h+'" rx="3" fill="'+s.c+'"/><text x="'+(x+bw*.32)+'" y="'+(H-pb-h-4)+'" font-size="10" font-weight="700" text-anchor="middle" fill="#0F172A">'+s.n+'</text>'+
-      '<text x="'+(x+bw*.32)+'" y="'+(H-pb+13)+'" font-size="9" text-anchor="middle" fill="#334155">'+esc(s.cur)+'</text>';}).join("")+
-    '<path d="'+pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ")+'" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-dasharray="4 3"/>'+pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#0F172A"/><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-6).toFixed(1)+'" font-size="9" text-anchor="middle" fill="#0F172A">'+Math.round(p[2]*100)+'%</text>').join("")+'</svg>'+
-    '<p class="fx-e" style="margin-top:2px">Barras = NCs por setor (maior para menor). Linha = % acumulado: mostra quantos setores concentram a maior parte das NCs.</p>';}
+function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),W=520,H=210,pl=12,pr=12,pt=18,pb=34,bw=(W-pl-pr)/L.length,mx=Math.max(1,...L.map(s=>s.n));
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block"><line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+(H-pb)+'" y2="'+(H-pb)+'" stroke="#E2E8F0"/>'+
+    L.map((s,i)=>{const h=s.n/mx*(H-pt-pb),x=pl+bw*i+bw*.18;return '<rect x="'+x+'" y="'+(H-pb-h)+'" width="'+(bw*.64)+'" height="'+h+'" rx="3" fill="'+s.c+'"/><text x="'+(x+bw*.32)+'" y="'+(H-pb-h-5)+'" font-size="11" font-weight="700" text-anchor="middle" fill="#0F172A">'+s.n+'</text>'+
+      '<text x="'+(x+bw*.32)+'" y="'+(H-pb+14)+'" font-size="9.5" text-anchor="middle" fill="#334155">'+esc(s.cur)+'</text>';}).join("")+'</svg>'+
+    '<p class="fx-e" style="margin-top:2px">Não conformidades por setor, do maior para o menor.</p>';}
 function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const len=Math.max(864e5,(isFinite(ate)?ate:Date.now())-de),pde=de-len;
   const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows().filter(o=>o.tipo==="Sobra"),sobA=s8;
   const def=[{k:"rep",l:"Reposição — ruas",cur:"Repos. ruas",c:"#16A34A",rows:ruasA,val:r=>pnum(r.Valor_Divergencia),pes:r=>r.Nome_Colaborador_NC},
@@ -1066,7 +1064,7 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
   const sobPer=sobA.filter(r=>r.ts>=de&&r.ts<ate);
   return fxHead(tit,tot)+
     fxKpis(S.map(s=>({t:s.l,v:s.n,c:s.c,s:BRL0(s.v)+" · "+(tot?Math.round(s.n/tot*100):0)+"% · "+varTxt(s.n,s.ant),sc:varCor(s.n,s.ant)})).concat([{t:"Total de NCs",v:tot,c:"#0F172A",s:BRL0(totV)+" · "+varTxt(tot,totAnt)+" vs período anterior",sc:varCor(tot,totAnt)}]),true)+
-    '<div class="fx-g"><div class="fx-col">'+fxCard("Pareto — onde estão as não conformidades",fxPareto(S))+'</div>'+
+    '<div class="fx-g"><div class="fx-col">'+fxCard("Não conformidades por setor",fxPareto(S))+'</div>'+
     '<div class="fx-col">'+fxCard("Setor com mais NCs",pior&&pior.n?'<p style="margin:2px 0 4px;font-size:24px;font-weight:700;color:'+pior.c+'">'+esc(pior.l)+'</p><p class="fx-e" style="color:#0F172A;font-size:12px">'+pior.n+' NCs · '+(tot?pc0(pior.n/tot):"")+' do total · '+BRL0(pior.v)+'<br>Maior ofensor: <b>'+esc(pior.top?curto(pior.top[0])+" ("+pior.top[1]+")":"—")+'</b> · '+varTxt(pior.n,pior.ant)+' vs período anterior</p>':'<p class="fx-e">Sem NCs no período.</p>')+
       fxCard("Participação no total",fxDonut(S.map(s=>({l:s.cur,v:s.n,c:s.c}))))+'</div></div>'+
     fxFull("Comparativo por setor",fxTable([{t:"Setor"},{t:"NCs",n:1},{t:"% do total",n:1},{t:"Valor",n:1},{t:"Valor médio/NC",n:1},{t:"Pessoas com NC",n:1},{t:"Maior ofensor"},{t:"Período anterior",n:1},{t:"Variação",n:1}],
