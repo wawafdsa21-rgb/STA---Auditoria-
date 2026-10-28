@@ -252,9 +252,9 @@
 
     <div class="block">
       <h3>Rotina 8074 — sobras (quantidade superior)</h3>
-      <div class="bstat"><span id="bs-src">Nenhuma rotina carregada</span><span><b id="bs-n">0</b> sobras</span></div>
+      <div class="bstat"><span id="bs-src">Nenhuma rotina carregada</span><span><b id="bs-n">0</b> registros</span></div>
       <label class="filebtn" style="width:100%">Importar rotina 8074 (.xls ou .xlsx)<input type="file" id="bs-file" accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
-      <p class="hint">Só as linhas de <b>QUANTIDADE SUPERIOR</b> (sobra) entram e contam como não conformidade da separação. Valor = quantidade × Vl. ult. entrada (286). Vai para a aba de sobras da planilha.</p>
+      <p class="hint">Mesmas regras da Expedição: sobra = quantidade superior (ou cód. 116), falta = quantidade inferior (ou cód. 117); repetidos da mesma O.S. e data/hora saem e cada item conta uma vez por O.S. Cada <b>separador + O.S. com sobra</b> é uma não conformidade; faltas ficam como informação. Valor = quantidade × Vl. ult. entrada (286).</p>
       <p class="okline" id="bs-msg"></p>
     </div>
 

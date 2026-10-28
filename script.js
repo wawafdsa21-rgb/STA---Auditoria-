@@ -1041,7 +1041,9 @@ function fxAero(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.aero).map(r=>Obj
 
 /* ---- Setores ---- */
 function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&FECH.dados.sobras.length)?FECH.dados.sobras:SOBRAS;
-  return dedupSobras(src).map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10])})).filter(o=>o.ts);}
+  return dedupSobras(src).map(a=>({ts:pts(String(a[0]).replace(/^(\d{4})-(\d{2})-(\d{2})/,"$3/$2/$1")),os:a[1],cod:a[2],desc:a[3],q:pnum(a[4]),conf:a[6],sep:a[8],sepM:a[7],v:pnum(a[10]),tipo:a[12]||"Sobra"})).filter(o=>o.ts);}
+/** Uma NC por separador + O.S. com sobra (regra da Expedição). */
+function ncs8074(L){const m=new Map();L.filter(o=>o.tipo==="Sobra").sort((a,b)=>a.ts-b.ts).forEach(o=>{const k=(o.sepM||o.sep)+"|"+o.os;const x=m.get(k);if(x){x.itens++;x.q+=o.q;x.v+=o.v;}else m.set(k,{ts:o.ts,os:o.os,sep:o.sep,sepM:o.sepM,itens:1,q:o.q,v:o.v});});return [...m.values()];}
 function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),tot=L.reduce((a,s)=>a+s.n,0)||1,W=520,H=210,pl=30,pr=34,pt=16,pb=46,bw=(W-pl-pr)/L.length,mx=Math.max(1,...L.map(s=>s.n));let acc=0;
   const pts=L.map((s,i)=>{acc+=s.n;return [pl+bw*i+bw/2,pt+(1-acc/tot)*(H-pt-pb),acc/tot];});
   return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block">'+[0,.5,1].map(g=>'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+(pt+(1-g)*(H-pt-pb))+'" y2="'+(pt+(1-g)*(H-pt-pb))+'" stroke="#E2E8F0"/><text x="'+(W-pr+4)+'" y="'+(pt+(1-g)*(H-pt-pb)+3)+'" font-size="9" fill="#64748B">'+Math.round(g*100)+'%</text>').join("")+
@@ -1050,11 +1052,11 @@ function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),tot=L.reduce((a,s)=>
     '<path d="'+pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ")+'" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-dasharray="4 3"/>'+pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#0F172A"/><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-6).toFixed(1)+'" font-size="9" text-anchor="middle" fill="#0F172A">'+Math.round(p[2]*100)+'%</text>').join("")+'</svg>'+
     '<p class="fx-e" style="margin-top:2px">Barras = NCs por setor (maior para menor). Linha = % acumulado: mostra quantos setores concentram a maior parte das NCs.</p>';}
 function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const len=Math.max(864e5,(isFinite(ate)?ate:Date.now())-de),pde=de-len;
-  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),sobA=sobrasRows();
+  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows(),sobA=ncs8074(s8),falA=s8.filter(o=>o.tipo==="Falta");
   const def=[{k:"rep",l:"Reposição — ruas",cur:"Repos. ruas",c:"#16A34A",rows:ruasA,val:r=>pnum(r.Valor_Divergencia),pes:r=>r.Nome_Colaborador_NC},
     {k:"ret",l:"Reposição — retorno",cur:"Repos. retorno",c:"#0E7490",rows:retA,val:r=>Math.abs(pnum(r.Valor_Divergencia)),pes:r=>r.Nome_Colaborador_NC},
     {k:"conf",l:"Cargas — conferência",cur:"Conferência",c:"#0EA5E9",rows:carA.filter(r=>r.Causador!=="Separador"),val:r=>pnum(r.Valor_Total),pes:r=>r.Nome_Causador||r.Nome_Conferente},
-    {k:"sep",l:"Separação — cargas + sobras 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Nome_Causador||r.sep},
+    {k:"sep",l:"Separação — cargas + NCs 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Nome_Causador||r.sep},
     {k:"aer",l:"Aéreo — operador",cur:"Aéreo",c:"#DC2626",rows:aerA,val:r=>pnum(r["Vlr. Total"]),pes:r=>r.Operador}];
   const S=def.map(d=>{const cur=d.rows.filter(r=>r.ts>=de&&r.ts<ate),ant=d.rows.filter(r=>r.ts>=pde&&r.ts<de);const v=cur.reduce((a,r)=>a+d.val(r),0);
     const p={};cur.forEach(r=>{const n=d.pes(r);if(n)p[n]=(p[n]||0)+1;});const topP=Object.entries(p).sort((a,b)=>b[1]-a[1])[0];
@@ -1072,7 +1074,7 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
       ord.map(s=>['<b style="color:'+s.c+'">'+esc(s.l)+'</b>','<b>'+s.n+'</b>',tot?pc0(s.n/tot):"—",BRL0(s.v),BRL0(s.med),s.pessoas,esc(s.top?curto(s.top[0])+" ("+s.top[1]+")":"—"),s.ant,'<b style="color:'+varCor(s.n,s.ant)+'">'+varTxt(s.n,s.ant)+'</b>'])))+
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Valor por setor",fxBars(S.slice().sort((a,b)=>b.v-a.v).map(s=>({l:s.cur,v:s.v,txt:BRL0(s.v),c:s.c}))))+
       fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,7).map(x=>({l:curto(x.n)+" · "+x.s.cur,v:x.i,txt:String(x.i),c:x.s.c}))))+
-      fxCard("Sobras 8074 — separadores",fxBars((function(){const o={};sobPer.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,7);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+x.q+" un",c:"#7C3AED"}))))+'</div>'+fxFoot("Setores auditados");}
+      fxCard("Sobras 8074 — NCs por separador",fxBars((function(){const o={};sobPer.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,7);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" NC · "+x.q+" un",c:"#7C3AED"})))+'<p class="fx-e" style="margin-top:6px">Uma NC por separador + O.S. com sobra (regra da Expedição). Faltas da 8074 no período: <b>'+falA.filter(r=>r.ts>=de&&r.ts<ate).length+'</b> (não geram NC).</p>')+'</div>'+fxFoot("Setores auditados");}
 
 // auditoria aéreo (operadores de empilhadeira)
 const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
@@ -1133,27 +1135,39 @@ const aOpIni=store.get("audcd_aero_op",null);if(aOpIni&&cIdx.has(aOpIni))aOp.set
 
 // rotina 8074 – quantidade superior (sobras)
 let SOBRAS=[],SOBINFO=null;
-function parse8074WB(wb){for(const sn of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:""});
-    const H=findHeader(rows,[x=>x==="MOTIVO",x=>x==="CODPROD",x=>x.startsWith("OSCARREG")||x==="OS"]);if(!H)continue;const ix=f=>H.h.findIndex(f);
-    const iD=ix(x=>x==="DATA"),iM=ix(x=>x==="MOTIVO"),iO=ix(x=>x.startsWith("OSCARREG")||x==="OS"),iC=ix(x=>x==="CODPROD"),iDe=ix(x=>x==="DESCRICAO"),iA=ix(x=>x==="ACAO"),iCf=ix(x=>x==="CONFERENTE"),iS=ix(x=>x==="SEPARADOR"),iOp=ix(x=>x==="OPERACAO");
-    const out=[],seen=new Set();
-    for(let r=H.i+1;r<rows.length;r++){const row=rows[r];if(!/SUPERIOR/i.test(String(row[iM])))continue;
-      const d=row[iD] instanceof Date?row[iD]:null;const ds=d?(isoDe(d)+" "+pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds())):String(row[iD]||"").trim();
-      const acao=String(row[iA]||"");const m=acao.match(/(?:QT|Quantidade)\s*:?\s*(\d+)/i);const qt=m?+m[1]:0;
-      const sp=v=>{const s=String(v||"").trim();const mm=s.match(/^(\d+)\s*-\s*(.+)$/);return mm?[mm[1],mm[2].trim()]:["",s==="-"?"":s];};
-      const cf=sp(row[iCf]),se=sp(row[iS]),os=String(row[iO]).trim().replace(/\.0+$/,""),cod=String(row[iC]).trim().replace(/\.0+$/,"");
-      const k=os+"|"+cod;if(seen.has(k))continue;seen.add(k);
-      const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
-      out.push([ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,k]);}
-    if(out.length)return out;}
-  throw new Error("Não encontrei as colunas MOTIVO, CODPROD e O.S/Carreg. (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
+// regras iguais às da Expedição: classifica sobra/falta, remove repetidos por O.S.+data/hora e conta cada item uma vez por O.S.
+function tipo8074(mot,cm,op,ac){mot=normTxt(mot);op=normTxt(op);ac=normTxt(ac);cm=String(cm||"").trim();
+  if(mot.includes("SUPERIOR")||cm==="116"||op.includes("SOBRA")||ac.includes("ACIMA")||ac.includes("A MAIOR"))return "Sobra";
+  if(mot.includes("INFERIOR")||cm==="117"||ac.includes("ABAIXO"))return "Falta";return null;}
+function normTxt(v){return String(v==null?"":v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();}
+function parse8074WB(wb){for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    const H=findHeader(rows,[x=>x==="MOTIVO",x=>x==="CODPROD",x=>x==="SEPARADOR"]);if(!H)continue;const ix=f=>H.h.findIndex(f);
+    const iD=ix(x=>x==="DATA"),iM=ix(x=>x==="MOTIVO"),iCM=ix(x=>x==="CODMOTIVO"),iC=ix(x=>x==="CODPROD"),iDe=ix(x=>x==="DESCRICAO"),iE=ix(x=>x==="EMBALAGEM"),
+      iA=ix(x=>x==="ACAO"),iCf=ix(x=>x==="CONFERENTE"),iS=ix(x=>x==="SEPARADOR"),iOp=ix(x=>x==="OPERACAO");
+    let iO=3;if(!String(rows[H.i][3]||"").trim())iO=ix(x=>x.startsWith("OSCARREG")||x==="OS"||x==="OSCARREGAMENTO");
+    const sp=v=>{const t=String(v||"").trim();const mm=t.match(/^(\d+)\s*-\s*(.+)$/);return mm?[mm[1],mm[2].trim()]:["",t==="-"?"":t];};
+    const quando=v=>{if(v instanceof Date&&!isNaN(v))return {ds:isoDe(v)+" "+pad(v.getHours())+":"+pad(v.getMinutes())+":"+pad(v.getSeconds()),k:isoDe(v)+" "+pad(v.getHours())+":"+pad(v.getMinutes())+":"+pad(v.getSeconds())};
+      if(typeof v==="number"){const d=new Date(Math.round((v-25569)*864e5));const t=d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())+" "+pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":"+pad(d.getUTCSeconds());return {ds:t,k:t};}
+      const t=String(v||"").trim();return {ds:t,k:t};};
+    let brutas=0,repHora=0,repItem=0;const vistoHora=new Set(),vistoItem=new Set(),out=[];
+    for(let r=H.i+1;r<rows.length;r++){const row=rows[r];const cod=String(row[iC]||"").trim().replace(/\.0+$/,""),sepTxt=String(row[iS]||"").trim();
+      if(!cod||!sepTxt||row[iD]==="")continue;
+      const tipo=tipo8074(row[iM],iCM>=0?row[iCM]:"",iOp>=0?row[iOp]:"",row[iA]);if(!tipo)continue;brutas++;
+      const os=String(row[iO]||"").trim().replace(/\.0+$/,""),q=quando(row[iD]);
+      const kh=os+"|"+q.k;if(vistoHora.has(kh)){repHora++;continue;}vistoHora.add(kh);
+      const se=sp(row[iS]),cf=sp(row[iCf]);const ki=os+"|"+cod+"|"+tipo+"|"+(se[0]||se[1]);if(vistoItem.has(ki)){repItem++;continue;}vistoItem.add(ki);
+      const m=String(row[iA]||"").match(/(\d+)\s*$/);const qt=m?+m[1]:0;const vl=pIdx.has(cod)?P.vl[pIdx.get(cod)]:0;
+      out.push([q.ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,ki,tipo,String(iE>=0?row[iE]:"").trim()]);}
+    if(out.length){out.resumo={brutas,repHora,repItem,sobras:out.filter(a=>a[12]==="Sobra").length,faltas:out.filter(a=>a[12]==="Falta").length,
+      ncs:new Set(out.filter(a=>a[12]==="Sobra").map(a=>(a[7]||a[8])+"|"+a[1])).size};return out;}}
+  throw new Error("Não encontrei as colunas DATA, MOTIVO, O.S, CODPROD e SEPARADOR (rotina 8074) ou nenhuma linha de sobra/falta.");}
 $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
   try{const wb=await lerLivro(file);const L=parse8074WB(wb);SOBRAS=dedupSobras(SOBRAS.concat(L));SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
-    msg.textContent=L.length+" sobras (quantidade superior) lidas, sem duplicatas (mesma O.S. e item contam uma vez). Enviando à planilha…";paintBases();
+    const R8=L.resumo;msg.textContent=R8.brutas+" linhas de sobra/falta · "+R8.repHora+" repetidas por O.S. e hora e "+R8.repItem+" repetidas por item removidas · "+R8.sobras+" sobras ("+R8.ncs+" não conformidades) e "+R8.faltas+" faltas. Enviando à planilha…";paintBases();
     let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Sobras guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
-    msg.textContent=L.length+" sobras (quantidade superior), sem duplicatas"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas da planilha":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+    msg.textContent=R8.sobras+" sobras ("+R8.ncs+" NCs por separador e O.S.) e "+R8.faltas+" faltas, sem repetidos"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
-function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2]);if(!m.has(k))m.set(k,a);});return [...m.values()];}
+function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2])+"|"+(a[12]||"Sobra")+"|"+(a[7]||a[8]||"");if(!m.has(k))m.set(k,a);});return [...m.values()];}
 IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows);SOBINFO=c.info;}}).catch(()=>{});
 
 

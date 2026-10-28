@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 18)
+ * Auditoria STA – Santa Therezinha (versão 19)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -156,7 +156,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 18, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 19, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -455,8 +455,13 @@ function lerRotina(ss, dias) {
 }
 
 /* ===================== Sobras de separação (rotina 8074) ===================== */
-const CAB_SOBRAS = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Matricula_Conferente', 'Conferente',
+const CAB_SOBRAS = ['Data', 'Tipo', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Embalagem', 'Quantidade', 'Matricula_Conferente', 'Conferente',
   'Matricula_Separador', 'Separador', 'Operacao', 'Valor_Total', 'Chave', 'Importado_Em'];
+/** Chave da regra da Expedição: O.S. + item + tipo + separador (linhas antigas sem tipo são sobras). */
+function chaveSobra(l, cab) {
+  const g = function (n) { const i = cab.indexOf(n); return i < 0 ? '' : String(l[i]).trim(); };
+  return g('Numero_OS') + '|' + g('Codigo_Produto') + '|' + (g('Tipo') || 'Sobra') + '|' + (g('Matricula_Separador') || g('Separador'));
+}
 function abaSobras(ss) {
   const sh = ss.getSheets().filter(function (x) { return normalizar(x.getName()).indexOf('SOBRA') >= 0; })[0] || ss.insertSheet('Sobras_Separacao');
   if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, CAB_SOBRAS.length).setValues([CAB_SOBRAS]).setFontWeight('bold');
@@ -466,24 +471,23 @@ function abaSobras(ss) {
 }
 /** Remove linhas repetidas (mesma O.S. + mesmo item), mantendo a primeira. */
 function removerDuplicatasSobras(sh, cab) {
-  const iO = cab.indexOf('Numero_OS'), iC = cab.indexOf('Codigo_Produto');
-  if (iO < 0 || iC < 0 || sh.getLastRow() < 3) return 0;
+  if (sh.getLastRow() < 3) return 0;
   const v = sh.getRange(2, 1, sh.getLastRow() - 1, cab.length).getDisplayValues(), vistos = new Set(), apagar = [];
-  v.forEach(function (l, i) { const k = String(l[iO]).trim() + '|' + String(l[iC]).trim(); if (vistos.has(k)) apagar.push(i + 2); else vistos.add(k); });
+  v.forEach(function (l, i) { const k = chaveSobra(l, cab); if (vistos.has(k)) apagar.push(i + 2); else vistos.add(k); });
   for (let i = apagar.length - 1; i >= 0; i--) sh.deleteRow(apagar[i]);
   return apagar.length;
 }
 function salvarSobras(linhas, sessao) {
   const ss = abrirPlanilha(), A = abaSobras(ss), sh = A.sh, cab = A.cab;
   const removidas = removerDuplicatasSobras(sh, cab);
-  const iO = cab.indexOf('Numero_OS'), iC = cab.indexOf('Codigo_Produto');
-  const ex = new Set(sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, cab.length).getDisplayValues().map(function (l) { return String(l[iO]).trim() + '|' + String(l[iC]).trim(); }) : []);
+  const ex = new Set(sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, cab.length).getDisplayValues().map(function (l) { return chaveSobra(l, cab); }) : []);
   const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'), novas = [];
   (linhas || []).forEach(function (a) {
-    const k = String(a[1]).trim() + '|' + String(a[2]).trim();
-    if (!a || !a[1] || ex.has(k)) return; ex.add(k);
-    const o = { Data: a[0], Numero_OS: a[1], Codigo_Produto: a[2], Descricao_Produto: a[3], Quantidade: Number(a[4]) || 0, Matricula_Conferente: a[5], Conferente: a[6],
-      Matricula_Separador: a[7], Separador: a[8], Operacao: a[9], Valor_Total: Number(a[10]) || 0, Chave: k, Importado_Em: agora };
+    if (!a || !a[1]) return;
+    const tipo = a[12] || 'Sobra', k = String(a[1]).trim() + '|' + String(a[2]).trim() + '|' + tipo + '|' + (String(a[7] || '').trim() || String(a[8] || '').trim());
+    if (ex.has(k)) return; ex.add(k);
+    const o = { Data: a[0], Tipo: tipo, Numero_OS: a[1], Codigo_Produto: a[2], Descricao_Produto: a[3], Embalagem: a[13] || '', Quantidade: Number(a[4]) || 0,
+      Matricula_Conferente: a[5], Conferente: a[6], Matricula_Separador: a[7], Separador: a[8], Operacao: a[9], Valor_Total: Number(a[10]) || 0, Chave: k, Importado_Em: agora };
     novas.push(cab.map(function (h) { return o[h] === undefined ? '' : o[h]; }));
   });
   if (novas.length) {
@@ -493,12 +497,12 @@ function salvarSobras(linhas, sessao) {
   }
   return { ok: true, adicionados: novas.length, duplicatasRemovidas: removidas, aba: sh.getName() };
 }
-/** [data, os, cod, desc, qtd, matConf, conf, matSep, sep, operacao, valor] */
+/** [data, os, cod, desc, qtd, matConf, conf, matSep, sep, operacao, valor, chave, tipo, embalagem] */
 function lerSobras(ss) {
   const sh = ss.getSheets().filter(function (x) { return normalizar(x.getName()).indexOf('SOBRA') >= 0; })[0];
   if (!sh || sh.getLastRow() < 2) return [];
   const v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues(), cab = v[0];
-  const ix = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Matricula_Conferente', 'Conferente', 'Matricula_Separador', 'Separador', 'Operacao', 'Valor_Total'].map(function (c) { return cab.indexOf(c); });
+  const ix = ['Data', 'Numero_OS', 'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Matricula_Conferente', 'Conferente', 'Matricula_Separador', 'Separador', 'Operacao', 'Valor_Total', 'Chave', 'Tipo', 'Embalagem'].map(function (c) { return cab.indexOf(c); });
   return v.slice(1).filter(function (l) { return ix[1] >= 0 && l[ix[1]]; }).map(function (l) { return ix.map(function (k) { return k < 0 ? '' : l[k]; }); });
 }
 
