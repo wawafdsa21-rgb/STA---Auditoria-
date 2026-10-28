@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 19)
+ * Auditoria STA – Santa Therezinha (versão 20)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -156,7 +156,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 19, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 20, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -473,7 +473,11 @@ function abaSobras(ss) {
 function removerDuplicatasSobras(sh, cab) {
   if (sh.getLastRow() < 3) return 0;
   const v = sh.getRange(2, 1, sh.getLastRow() - 1, cab.length).getDisplayValues(), vistos = new Set(), apagar = [];
-  v.forEach(function (l, i) { const k = chaveSobra(l, cab); if (vistos.has(k)) apagar.push(i + 2); else vistos.add(k); });
+  const iT = cab.indexOf('Tipo');
+  v.forEach(function (l, i) {
+    if (iT >= 0 && String(l[iT]).trim() === 'Falta') { apagar.push(i + 2); return; } // só quantidade superior
+    const k = chaveSobra(l, cab); if (vistos.has(k)) apagar.push(i + 2); else vistos.add(k);
+  });
   for (let i = apagar.length - 1; i >= 0; i--) sh.deleteRow(apagar[i]);
   return apagar.length;
 }
@@ -483,8 +487,8 @@ function salvarSobras(linhas, sessao) {
   const ex = new Set(sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, cab.length).getDisplayValues().map(function (l) { return chaveSobra(l, cab); }) : []);
   const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'), novas = [];
   (linhas || []).forEach(function (a) {
-    if (!a || !a[1]) return;
-    const tipo = a[12] || 'Sobra', k = String(a[1]).trim() + '|' + String(a[2]).trim() + '|' + tipo + '|' + (String(a[7] || '').trim() || String(a[8] || '').trim());
+    if (!a || !a[1] || (a[12] && a[12] !== 'Sobra')) return;
+    const tipo = 'Sobra', k = String(a[1]).trim() + '|' + String(a[2]).trim() + '|' + tipo + '|' + (String(a[7] || '').trim() || String(a[8] || '').trim());
     if (ex.has(k)) return; ex.add(k);
     const o = { Data: a[0], Tipo: tipo, Numero_OS: a[1], Codigo_Produto: a[2], Descricao_Produto: a[3], Embalagem: a[13] || '', Quantidade: Number(a[4]) || 0,
       Matricula_Conferente: a[5], Conferente: a[6], Matricula_Separador: a[7], Separador: a[8], Operacao: a[9], Valor_Total: Number(a[10]) || 0, Chave: k, Importado_Em: agora };

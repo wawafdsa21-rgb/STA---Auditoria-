@@ -1052,7 +1052,7 @@ function fxPareto(S){const L=S.slice().sort((a,b)=>b.n-a.n),tot=L.reduce((a,s)=>
     '<path d="'+pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ")+'" fill="none" stroke="#0F172A" stroke-width="1.6" stroke-dasharray="4 3"/>'+pts.map(p=>'<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#0F172A"/><text x="'+p[0].toFixed(1)+'" y="'+(p[1]-6).toFixed(1)+'" font-size="9" text-anchor="middle" fill="#0F172A">'+Math.round(p[2]*100)+'%</text>').join("")+'</svg>'+
     '<p class="fx-e" style="margin-top:2px">Barras = NCs por setor (maior para menor). Linha = % acumulado: mostra quantos setores concentram a maior parte das NCs.</p>';}
 function fxSetores(){const tit="Não conformidades por setor — Fechamento";const [de,ate]=fxPeriodo();const len=Math.max(864e5,(isFinite(ate)?ate:Date.now())-de),pde=de-len;
-  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows(),sobA=ncs8074(s8),falA=s8.filter(o=>o.tipo==="Falta");
+  const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows().filter(o=>o.tipo==="Sobra"),sobA=ncs8074(s8);
   const def=[{k:"rep",l:"Reposição — ruas",cur:"Repos. ruas",c:"#16A34A",rows:ruasA,val:r=>pnum(r.Valor_Divergencia),pes:r=>r.Nome_Colaborador_NC},
     {k:"ret",l:"Reposição — retorno",cur:"Repos. retorno",c:"#0E7490",rows:retA,val:r=>Math.abs(pnum(r.Valor_Divergencia)),pes:r=>r.Nome_Colaborador_NC},
     {k:"conf",l:"Cargas — conferência",cur:"Conferência",c:"#0EA5E9",rows:carA.filter(r=>r.Causador!=="Separador"),val:r=>pnum(r.Valor_Total),pes:r=>r.Nome_Causador||r.Nome_Conferente},
@@ -1074,7 +1074,7 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
       ord.map(s=>['<b style="color:'+s.c+'">'+esc(s.l)+'</b>','<b>'+s.n+'</b>',tot?pc0(s.n/tot):"—",BRL0(s.v),BRL0(s.med),s.pessoas,esc(s.top?curto(s.top[0])+" ("+s.top[1]+")":"—"),s.ant,'<b style="color:'+varCor(s.n,s.ant)+'">'+varTxt(s.n,s.ant)+'</b>'])))+
     '<div class="fx-g3" style="margin-top:10px">'+fxCard("Valor por setor",fxBars(S.slice().sort((a,b)=>b.v-a.v).map(s=>({l:s.cur,v:s.v,txt:BRL0(s.v),c:s.c}))))+
       fxCard("Colaboradores com mais NCs",fxBars(Object.values(pessoas).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,7).map(x=>({l:curto(x.n)+" · "+x.s.cur,v:x.i,txt:String(x.i),c:x.s.c}))))+
-      fxCard("Sobras 8074 — NCs por separador",fxBars((function(){const o={};sobPer.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,7);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" NC · "+x.q+" un",c:"#7C3AED"})))+'<p class="fx-e" style="margin-top:6px">Uma NC por separador + O.S. com sobra (regra da Expedição). Faltas da 8074 no período: <b>'+falA.filter(r=>r.ts>=de&&r.ts<ate).length+'</b> (não geram NC).</p>')+'</div>'+fxFoot("Setores auditados");}
+      fxCard("Sobras 8074 — NCs por separador",fxBars((function(){const o={};sobPer.forEach(s=>{const k=s.sep||"—";const x=o[k]=o[k]||{n:k,i:0,q:0};x.i++;x.q+=s.q;});return Object.values(o).sort((a,b)=>b.i-a.i).slice(0,7);})().map(x=>({l:curto(x.n),v:x.i,txt:x.i+" NC · "+x.q+" un",c:"#7C3AED"})))+'<p class="fx-e" style="margin-top:6px">Somente quantidade superior, sem duplicatas. Uma NC por separador + O.S. com sobra.</p>')+'</div>'+fxFoot("Setores auditados");}
 
 // auditoria aéreo (operadores de empilhadeira)
 const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
@@ -1135,10 +1135,10 @@ const aOpIni=store.get("audcd_aero_op",null);if(aOpIni&&cIdx.has(aOpIni))aOp.set
 
 // rotina 8074 – quantidade superior (sobras)
 let SOBRAS=[],SOBINFO=null;
-// regras iguais às da Expedição: classifica sobra/falta, remove repetidos por O.S.+data/hora e conta cada item uma vez por O.S.
+// 8074: lê somente QUANTIDADE SUPERIOR (sobra); remove repetidos por O.S.+data/hora e conta cada item uma vez por O.S.
 function tipo8074(mot,cm,op,ac){mot=normTxt(mot);op=normTxt(op);ac=normTxt(ac);cm=String(cm||"").trim();
   if(mot.includes("SUPERIOR")||cm==="116"||op.includes("SOBRA")||ac.includes("ACIMA")||ac.includes("A MAIOR"))return "Sobra";
-  if(mot.includes("INFERIOR")||cm==="117"||ac.includes("ABAIXO"))return "Falta";return null;}
+  return null;}
 function normTxt(v){return String(v==null?"":v).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase();}
 function parse8074WB(wb){for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
     const H=findHeader(rows,[x=>x==="MOTIVO",x=>x==="CODPROD",x=>x==="SEPARADOR"]);if(!H)continue;const ix=f=>H.h.findIndex(f);
@@ -1160,15 +1160,15 @@ function parse8074WB(wb){for(const sn of wb.SheetNames){const ws=wb.Sheets[sn];c
       out.push([q.ds,os,cod,String(row[iDe]||"").trim(),qt,cf[0],cf[1],se[0],se[1],String(iOp>=0?row[iOp]:"").trim(),Math.round(qt*vl*100)/100,ki,tipo,String(iE>=0?row[iE]:"").trim()]);}
     if(out.length){out.resumo={brutas,repHora,repItem,sobras:out.filter(a=>a[12]==="Sobra").length,faltas:out.filter(a=>a[12]==="Falta").length,
       ncs:new Set(out.filter(a=>a[12]==="Sobra").map(a=>(a[7]||a[8])+"|"+a[1])).size};return out;}}
-  throw new Error("Não encontrei as colunas DATA, MOTIVO, O.S, CODPROD e SEPARADOR (rotina 8074) ou nenhuma linha de sobra/falta.");}
+  throw new Error("Não encontrei as colunas DATA, MOTIVO, O.S, CODPROD e SEPARADOR (rotina 8074) ou nenhuma linha de QUANTIDADE SUPERIOR.");}
 $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.target.value="";if(!file)return;const msg=$("bs-msg");msg.style.color="";msg.textContent="Lendo "+file.name+"…";
   try{const wb=await lerLivro(file);const L=parse8074WB(wb);SOBRAS=dedupSobras(SOBRAS.concat(L));SOBINFO={ts:Date.now(),nome:file.name};IDB.set("sobras",{rows:SOBRAS,info:SOBINFO}).catch(()=>{});
-    const R8=L.resumo;msg.textContent=R8.brutas+" linhas de sobra/falta · "+R8.repHora+" repetidas por O.S. e hora e "+R8.repItem+" repetidas por item removidas · "+R8.sobras+" sobras ("+R8.ncs+" não conformidades) e "+R8.faltas+" faltas. Enviando à planilha…";paintBases();
+    const R8=L.resumo;msg.textContent=R8.brutas+" linhas de quantidade superior · "+(R8.repHora+R8.repItem)+" duplicatas removidas ("+R8.repHora+" por O.S. e hora, "+R8.repItem+" por item na O.S.) · "+R8.sobras+" sobras = "+R8.ncs+" não conformidades. Enviando à planilha…";paintBases();
     let j=null;if(!DEMO&&SHEET_URL&&navigator.onLine&&LOGIN&&LOGIN.token){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"sobras_salvar",token:LOGIN.token,linhas:L}),redirect:"follow",cache:"no-store"});j=await r.json();if(!j.ok)throw new Error(j.erro);}catch(x){j=null;toast("Sobras guardadas neste aparelho. Envio à planilha: "+(x.message||"falhou"));}}
-    msg.textContent=R8.sobras+" sobras ("+R8.ncs+" NCs por separador e O.S.) e "+R8.faltas+" faltas, sem repetidos"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
+    msg.textContent=R8.sobras+" sobras sem duplicatas ("+R8.ncs+" NCs por separador e O.S.)"+(j?" · "+j.adicionados+" novas gravadas na planilha (aba "+(j.aba||"de sobras")+")"+(j.duplicatasRemovidas?" · "+j.duplicatasRemovidas+" duplicatas removidas":"")+".":" · guardadas neste aparelho.");toast("Rotina 8074 importada.");}
   catch(x){msg.style.color="var(--alert)";msg.textContent=x.message||"Não foi possível ler o arquivo.";}});
 function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2])+"|"+(a[12]||"Sobra")+"|"+(a[7]||a[8]||"");if(!m.has(k))m.set(k,a);});return [...m.values()];}
-IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows);SOBINFO=c.info;}}).catch(()=>{});
+IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows.filter(a=>(a[12]||"Sobra")==="Sobra"));SOBINFO=c.info;}}).catch(()=>{});
 
 
 // auditoria de retorno (por rua, vários lançamentos)
