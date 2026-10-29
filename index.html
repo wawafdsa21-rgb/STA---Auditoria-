@@ -152,6 +152,9 @@
       <div class="field" id="a-qtd-f"><label for="a-qtd">Quantidade encontrada</label><div class="stepper"><button type="button" data-aq="-1" aria-label="Diminuir">−</button><input class="in" id="a-qtd" type="number" inputmode="numeric" min="0" step="1" placeholder="0"><button type="button" data-aq="1" aria-label="Aumentar">+</button></div></div>
       <div class="money"><span>Valor total<br><small id="a-calc"></small></span><b id="a-valor">R$ 0,00</b></div>
       <div class="field" id="a-obs-f"><label for="a-obs">Observação</label><textarea class="in" id="a-obs" placeholder="Opcional"></textarea></div>
+      <div class="field" id="a-foto-f"><span class="lbl">Fotos da ocorrência <small>(obrigatória, até 3)</small></span>
+        <div class="photos" id="a-fotos"></div>
+        <div class="ph-row"><label class="filebtn" id="a-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="a-foto"></label><label class="filebtn" id="a-gal">Galeria<input type="file" accept="image/*" id="a-foto-g"></label></div></div>
     </div>
     <button type="button" class="save" id="a-save">Salvar e lançar próximo</button>
     <div id="a-list" style="margin-top:12px"></div>
@@ -179,6 +182,7 @@
           <button type="button" role="radio" aria-checked="false" data-m="Avaria">Avaria</button>
           <button type="button" role="radio" aria-checked="false" data-m="Abastecimento">Abastecimento</button>
           <button type="button" role="radio" aria-checked="false" data-m="Sobras">Sobras</button>
+          <button type="button" role="radio" aria-checked="false" data-m="Produto trocado" style="grid-column:1/-1">Produto trocado</button>
         </div></div>
       <div class="field" id="g-cau-f"><span class="lbl">Causador da ocorrência</span>
         <div class="mot cau" role="radiogroup" aria-label="Causador">
@@ -188,7 +192,7 @@
         <div class="hint" id="g-cau-h"></div>
         <div id="g-sep-w" hidden style="margin-top:8px"><label class="lbl" style="font-weight:600;font-size:.88rem">Separador</label><div id="g-sep"></div></div>
       </div>
-      <div class="field" id="g-foto-f" hidden><span class="lbl">Fotos da sobra <small>(obrigatória, até 3)</small></span>
+      <div class="field" id="g-foto-f" hidden><span class="lbl">Fotos da ocorrência <small>(obrigatória, até 3)</small></span>
         <div class="photos" id="g-fotos"></div>
         <div class="ph-row"><label class="filebtn" id="g-cam">Tirar foto<input type="file" accept="image/*" capture="environment" id="g-foto"></label><label class="filebtn" id="g-gal">Galeria<input type="file" accept="image/*" id="g-foto-g"></label></div></div>
     </div>
