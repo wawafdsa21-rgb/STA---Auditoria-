@@ -1,5 +1,5 @@
 /**
- * Auditoria STA – Santa Therezinha (versão 20)
+ * Auditoria STA – Santa Therezinha (versão 21)
  * Recebe os lançamentos do aplicativo e grava na planilha:
  *   - Auditoria_Ruas     (permissão aud_rua)
  *   - Auditoria_Retorno  (permissão aud_ret)
@@ -52,11 +52,11 @@ const ABAS = {
   aero: {
     nome: 'Auditoria_Aero', perm: 'aud_aer',
     colunas: ['Data', 'Operador', 'Código', 'Descrição', 'Rua', 'O.S', 'Tipo de O.S', 'Quantidade', 'Vlr. Total',
-      'ID_Auditoria', 'DataHora', 'Matricula_Operador', 'Vl_Ult_Entrada', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em'],
+      'ID_Auditoria', 'DataHora', 'Matricula_Operador', 'Vl_Ult_Entrada', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em', 'Links_Fotos'],
     texto: ['Data', 'Código', 'O.S', 'ID_Auditoria', 'DataHora', 'Matricula_Operador', 'Matricula_Auditor']
   }
 };
-const MOTIVOS_CARGA = ['Falta', 'Avaria', 'Abastecimento', 'Sobras'];
+const MOTIVOS_CARGA = ['Falta', 'Avaria', 'Abastecimento', 'Sobras', 'Produto trocado'];
 
 /* ===================== Entradas ===================== */
 
@@ -70,6 +70,7 @@ function doPost(e) {
   const sessao = validarToken(dados.token);
   if (!sessao.ok) return resposta({ ok: false, erro: sessao.erro, login: true });
 
+  if (dados.acao === 'fotos') return resposta(lerFotos(dados.ids));
   if (dados.acao === 'colab_salvar') return resposta(salvarColaboradores(dados.lista, sessao));
   if (dados.acao === 'sobras_salvar') {
     if (sessao.permissoes.indexOf('aud_adm') < 0) return resposta({ ok: false, erro: 'Importar a rotina 8074 é só para ADM.' });
@@ -138,14 +139,14 @@ function doGet(e) {
         ok: true,
         ruas: !tem('aud_rua') ? vazio : lerAba(ss, ABAS.ruas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Endereco', 'Rua', 'Erro_Produto', 'Prox_Vencimento',
           'Sem_Saldo', 'Avaria', 'Possui_NC', 'Qtd_Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em',
-          'Produto', 'Descricao_Produto', 'Endereco_Correto', 'Data_Vencimento', 'Tipo_Avaria', 'Vl_Ult_Entrada', 'Observacao', 'Predio', 'Nivel', 'Apto', 'Funcao_Colaborador_NC']),
+          'Produto', 'Descricao_Produto', 'Endereco_Correto', 'Data_Vencimento', 'Tipo_Avaria', 'Vl_Ult_Entrada', 'Observacao', 'Predio', 'Nivel', 'Apto', 'Funcao_Colaborador_NC', 'Links_Fotos']),
         retorno: !tem('aud_ret') ? vazio : lerAba(ss, ABAS.retorno.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Produto', 'Descricao_Produto', 'Rua', 'Prox_Vencimento',
-          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS', 'Data_Vencimento', 'Observacao', 'Vl_Ult_Entrada', 'Funcao_Colaborador_NC']),
+          'Possui_NC', 'Qtd_Etiqueta', 'Qtd_Fisico', 'Valor_Total', 'Divergencia_Un', 'Valor_Divergencia', 'Matricula_Colaborador_NC', 'Nome_Colaborador_NC', 'Status_NC', 'ID_Sessao', 'Recebido_Em', 'Numero_OS', 'Data_Vencimento', 'Observacao', 'Vl_Ult_Entrada', 'Funcao_Colaborador_NC', 'Foto_Retorno', 'Foto_Etiqueta', 'Links_Fotos']),
         rotina: !tem('aud_ret') ? [] : lerRotina(ss, 400),
         cargas: !tem('aud_car') ? vazio : lerAba(ss, ABAS.cargas.nome, ['ID_Auditoria', 'DataHora', 'Matricula_Auditor', 'Nome_Auditor', 'Matricula_Conferente', 'Nome_Conferente', 'Box', 'Numero_OS',
-          'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em']),
+          'Codigo_Produto', 'Descricao_Produto', 'Quantidade', 'Motivo', 'Valor_Total', 'Causador', 'Matricula_Causador', 'Nome_Causador', 'ID_Sessao', 'Recebido_Em', 'Links_Fotos']),
         aero: !tem('aud_aer') ? vazio : lerAba(ss, ABAS.aero.nome, ['ID_Auditoria', 'Data', 'DataHora', 'Matricula_Operador', 'Operador', 'Código', 'Descrição', 'Rua', 'O.S',
-          'Tipo de O.S', 'Quantidade', 'Vl_Ult_Entrada', 'Vlr. Total', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em']),
+          'Tipo de O.S', 'Quantidade', 'Vl_Ult_Entrada', 'Vlr. Total', 'Observacao', 'Matricula_Auditor', 'Nome_Auditor', 'Status_NC', 'Recebido_Em', 'Links_Fotos']),
         sobras: s.permissoes.indexOf('aud_adm') < 0 ? [] : lerSobras(ss),
         quadro: lerQuadro(ss)
       };
@@ -156,7 +157,7 @@ function doGet(e) {
       if (!s.ok) return resposta({ ok: false, erro: s.erro, login: true });
       return listarRegistros(ss);
     }
-    return resposta({ ok: true, servico: 'Auditoria STA', versao: 20, planilha: ss.getName() });
+    return resposta({ ok: true, servico: 'Auditoria STA', versao: 21, planilha: ss.getName() });
   } catch (err) {
     return resposta({ ok: false, erro: 'Sem acesso à planilha: ' + err });
   }
@@ -338,6 +339,7 @@ function gravar(ss, cfg, registros) {
   cfg.colunas.forEach(function (c) {
     if (cab.indexOf(c) < 0) { sh.getRange(1, cab.length + 1).setValue(c); cab.push(c); }
   });
+  if (cfg === ABAS.cargas) validarMotivosCarga(sh);
   const colId = cab.indexOf('ID_Auditoria');
   const existentes = new Set(sh.getLastRow() > 1
     ? sh.getRange(2, colId + 1, sh.getLastRow() - 1, 1).getValues().map(function (l) { return String(l[0]); })
@@ -353,8 +355,8 @@ function gravar(ss, cfg, registros) {
         r.Foto_Retorno = fr; r.Foto_Etiqueta = fe;
         r.Links_Fotos = [fr, fe].filter(String).join(' ');
       } else if (cfg === ABAS.cargas) {
-        r.Links_Fotos = r.Motivo === 'Sobras'
-          ? (r.fotos || []).map(function (d, i) { return salvarFoto(d, r.ID_Auditoria + '_sobra_' + (i + 1)); }).filter(String).join(' ')
+        r.Links_Fotos = true
+          ? (r.fotos || []).map(function (d, i) { return salvarFoto(d, r.ID_Auditoria + '_' + (i + 1)); }).filter(String).join(' ')
           : '';
       } else {
         r.Links_Fotos = (r.fotos || []).map(function (d, i) { return salvarFoto(d, r.ID_Auditoria + '_' + (i + 1)); }).filter(String).join(' ');
@@ -381,6 +383,31 @@ function salvarFoto(dataUrl, nome) {
   if (!m) return '';
   const blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], nome + '.jpg');
   return obterPasta().createFile(blob).getUrl();
+}
+
+/** Devolve as fotos do Drive como data URL (para imprimir as NCs com foto). */
+function lerFotos(ids) {
+  const out = {};
+  (ids || []).slice(0, 20).forEach(function (id) {
+    try {
+      const b = DriveApp.getFileById(String(id)).getBlob();
+      out[id] = 'data:' + (b.getContentType() || 'image/jpeg') + ';base64,' + Utilities.base64Encode(b.getBytes());
+    } catch (e) { }
+  });
+  return { ok: true, fotos: out };
+}
+
+/** Mantém a lista de motivos da aba de cargas atualizada. */
+function validarMotivosCarga(sh) {
+  try {
+    const cab = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String), iMot = cab.indexOf('Motivo');
+    if (iMot < 0) return;
+    const r = sh.getRange(2, iMot + 1, sh.getMaxRows() - 1, 1), atual = r.getDataValidation();
+    const lista = atual && atual.getCriteriaValues && atual.getCriteriaValues()[0];
+    if (lista && Array.isArray(lista) && lista.indexOf('Produto trocado') >= 0) return;
+    r.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(MOTIVOS_CARGA, true).setAllowInvalid(false)
+      .setHelpText('Escolha: Falta, Avaria, Abastecimento, Sobras ou Produto trocado').build());
+  } catch (e) { }
 }
 
 function obterPasta() {
@@ -617,7 +644,7 @@ function prepararAbaCargas() {
   const iMot = cab.indexOf('Motivo');
   if (iMot >= 0) {
     const regra = SpreadsheetApp.newDataValidation().requireValueInList(MOTIVOS_CARGA, true).setAllowInvalid(false)
-      .setHelpText('Escolha: Falta, Avaria, Abastecimento ou Sobras').build();
+      .setHelpText('Escolha: Falta, Avaria, Abastecimento, Sobras ou Produto trocado').build();
     sh.getRange(2, iMot + 1, sh.getMaxRows() - 1, 1).setDataValidation(regra);
   }
   sh.autoResizeColumns(1, cab.length);
