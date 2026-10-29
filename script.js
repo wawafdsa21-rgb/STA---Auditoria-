@@ -235,7 +235,7 @@ const MAXF=3;
 function paintFotos(){const box=$("r-fotos");box.innerHTML=R.fotos.map((src,i)=>'<div class="ph-it"><img src="'+src+'" alt="Foto '+(i+1)+' do endereço"><button type="button" data-i="'+i+'" aria-label="Remover foto '+(i+1)+'">×</button></div>').join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>{R.fotos.splice(+b.dataset.i,1);paintFotos();});
   const full=R.fotos.length>=MAXF;$("r-cam").hidden=full;$("r-gal").hidden=full;
-  $("r-foto-h").textContent=full?"Limite de 3 fotos. Remova uma para trocar.":(R.flags.avaria?"Obrigatória: tire ao menos uma foto da avaria.":"Opcional. Obrigatória quando houver avaria.");}
+  $("r-foto-h").textContent=full?"Limite de 3 fotos. Remova uma para trocar.":(Object.values(R.flags).some(Boolean)?"Obrigatória: tire ao menos uma foto da não conformidade.":"Obrigatória em toda não conformidade.");}
 async function addFoto(e){const f=e.target.files[0];e.target.value="";if(!f||R.fotos.length>=MAXF)return;
   try{R.fotos.push(await compress(f));paintFotos();setErr("r-foto-f","");}catch(x){toast("Não foi possível ler a foto. Tente novamente.");}}
 $("r-foto").addEventListener("change",addFoto);$("r-foto-g").addEventListener("change",addFoto);
@@ -259,7 +259,7 @@ $("r-save").addEventListener("click",async()=>{
   chk(f.venc&&!venc,"r-venc-f","Informe a data de vencimento.");
   chk(f.venc&&venc&&venc<todayISO(),"r-venc-f","A data não pode ser anterior a hoje.");
   chk(f.avaria&&!$("r-tipo").value,"r-tipo-f","Escolha o tipo de avaria.");
-  chk(f.avaria&&!R.fotos.length,"r-foto-f","Tire ao menos uma foto da avaria.");
+  chk(nc&&!R.fotos.length,"r-foto-f",f.avaria?"Tire ao menos uma foto da avaria.":"Tire ao menos uma foto da não conformidade.");
   chk(f.avaria&&$("r-tipo").value==="Outro"&&!$("r-obs").value.trim(),"r-obs-f","Descreva a avaria na observação.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
   const now=new Date(),[rua,pre,niv,apt]=E.id[ad].split("-"),vl=P.vl[R.prod],qq=nc?q:0,ri=rRep.value;
@@ -333,10 +333,10 @@ function renderRecords(){if(typeof renderSess==="function")try{renderSess();}cat
   if(!list.length){L.innerHTML='<div class="empty">Nenhum registro com estes filtros.<br>Ajuste o período ou o tipo.</div>';return;}
   const adm=temPerm("aud_adm");L.innerHTML=list.slice(0,200).map(r=>{let h=r._aba==="retorno"?cardRet(r):r._aba==="cargas"?cardCar(r):r._aba==="aero"?cardAer(r):card(r);if(adm)h=h.replace(/<\/details>$/,'<button type="button" class="btn full rdel" data-id="'+esc(r.ID_Auditoria)+'" data-aba="'+esc(r._aba||"ruas")+'" style="margin-top:8px;color:var(--alert);border-color:var(--alert)">Excluir registro</button></details>');return h;}).join("")+(list.length>200?'<p class="note">Mostrando 200 de '+list.length+'. O CSV inclui todos.</p>':"");
   L.querySelectorAll(".rdel").forEach(b=>b.onclick=()=>excluirRegistro(b.dataset.id,b.dataset.aba));
-  L.querySelectorAll(".cgrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openCarDoc(recs[0].Sessao,recs);});
-  L.querySelectorAll(".rtrel").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openRetDoc(recs[0].Sessao,recs);});
-  L.querySelectorAll(".rbtn").forEach(b=>b.onclick=()=>{const recs=allRecs().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length)openSessDoc(recs[0].Sessao,recs);});
-  L.querySelectorAll(".pbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r)openPrint(r);});
+  L.querySelectorAll(".cgrel").forEach(b=>b.onclick=async()=>{const recs=regBase().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length){await carregarFotosPlanilha(recs);openCarDoc(recs[0].Sessao||sessaoDe(recs[0],recs),recs);}});
+  L.querySelectorAll(".rtrel").forEach(b=>b.onclick=async()=>{const recs=regBase().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length){await carregarFotosPlanilha(recs);openRetDoc(recs[0].Sessao||sessaoDe(recs[0],recs),recs);}});
+  L.querySelectorAll(".rbtn").forEach(b=>b.onclick=async()=>{const recs=regBase().filter(x=>x.ID_Sessao===b.dataset.s);if(recs.length){await carregarFotosPlanilha(recs);openSessDoc(recs[0].Sessao||sessaoDe(recs[0],recs),recs);}});
+  L.querySelectorAll(".pbtn").forEach(b=>b.onclick=async()=>{const r=regBase().find(x=>x.ID_Auditoria===b.dataset.id);if(r){await carregarFotosPlanilha([r]);openPrint(r);}});
   L.querySelectorAll(".wbtn").forEach(b=>b.onclick=()=>{const r=allRecs().find(x=>x.ID_Auditoria===b.dataset.id);if(r){openPrint(r);sendWA(r,$("pv-wa"));}});
 }
 function cardCar(r){const cls=r.Motivo==="Sobras"?"tr":"nc";const fotos=r.fotos||[];
@@ -389,8 +389,8 @@ let SHEET_URL=store.get("audcd_sheet_url","");
 if(!SHEET_URL||SHEET_OLD.includes(SHEET_URL)){SHEET_URL=SHEET_DEFAULT;store.set("audcd_sheet_url","");}
 let syncing=false,syncAgain=false,lastSheetErr="",lastSheetOk=store.get("audcd_sheet_ok","");
 const SHEET_COLS=COLS.concat(["ID_Sessao"]);
-function toSheet(r){if(r._aba==="aero"){const x={_aba:"aero"};AER_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));return x;}
-  if(r._aba==="cargas"){const x={_aba:"cargas"};CAR_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.fotos=r.Motivo==="Sobras"?(r.fotos||[]):[];return x;}
+function toSheet(r){if(r._aba==="aero"){const x={_aba:"aero"};AER_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.fotos=r.fotos||[];return x;}
+  if(r._aba==="cargas"){const x={_aba:"cargas"};CAR_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.fotos=r.fotos||[];return x;}
   if(r._aba==="retorno"){const x={_aba:"retorno"};RET_COLS.forEach(c=>x[c]=r[c]==null?"":(typeof r[c]==="number"?Math.round(r[c]*100)/100:r[c]));x.foto_retorno=r.foto_retorno||"";x.foto_etiqueta=r.foto_etiqueta||"";return x;}
   const o=norm2(r),x={_aba:"ruas"};SHEET_COLS.forEach(c=>x[c]=o[c]==null?"":o[c]);x.fotos=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);return x;}
 function sheetPending(){let n=0;HIST.forEach(r=>{if(r._sheet!==SHEET_URL)n++;});return n;}
@@ -944,7 +944,8 @@ function paintXnc(){const b=$("f-fonte");if(b)b.hidden=!temPerm("aud_adm");}
 // registros: todas as auditorias, fonte (aparelho/planilha), impressão e exclusão
 var REG={rows:null,busy:false,info:""};
 function regFonte(){return typeof temPerm==="function"&&LOGIN&&temPerm("aud_adm")&&$("f-fonte").value==="planilha"?"planilha":"local";}
-function sheetRecs(){const j=REG.rows;if(!j)return [];const B=(r,ks)=>{ks.forEach(k=>{if(k in r)r[k]=pbool(r[k]);});return r;};
+function sheetRecs(){const j=REG.rows;if(!j)return [];if(REG._cache&&REG._cacheSrc===j&&REG._cacheN===REG._ver)return REG._cache;REG._cacheSrc=j;REG._cacheN=REG._ver;return REG._cache=sheetRecs0(j);}
+function sheetRecs0(j){const B=(r,ks)=>{ks.forEach(k=>{if(k in r)r[k]=pbool(r[k]);});return r;};
   return [].concat(fxRows(j.ruas).map(r=>B(Object.assign(r,{_aba:"ruas",_sheet:1}),["Possui_NC","Erro_Produto","Prox_Vencimento","Sem_Saldo","Avaria"])),
     fxRows(j.retorno).map(r=>B(Object.assign(r,{_aba:"retorno",_sheet:1}),["Possui_NC","Prox_Vencimento"])),
     fxRows(j.cargas).map(r=>Object.assign(r,{_aba:"cargas",_sheet:1,Possui_NC:true,Status_NC:r.Status_NC||"Aberta"})),
@@ -977,7 +978,7 @@ async function excluirRegistro(id,aba){if(!temPerm("aud_adm"))return;if(!confirm
   let ok=true;if(!DEMO&&SHEET_URL){if(!navigator.onLine){toast("Sem internet: não dá para excluir da planilha agora.");return;}
     try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"admin_excluir",token:LOGIN.token,aba,id}),redirect:"follow",cache:"no-store"});const j=await r.json();if(!j.ok){ok=false;toast(j.erro||"Não foi possível excluir na planilha.");}}catch(e){ok=false;toast("Não foi possível falar com a planilha.");}}
   if(!ok)return;HIST.delete(id);IDB.del(id).catch(()=>{});const qi=queue.findIndex(x=>x.rec.ID_Auditoria===id);if(qi>=0){queue.splice(qi,1);saveQueue();}
-  remote.ruas=remote.ruas.filter(r=>r.ID_Auditoria!==id);
+  remote.ruas=remote.ruas.filter(r=>r.ID_Auditoria!==id);REG._ver=(REG._ver||0)+1;
   if(REG.rows){["ruas","retorno","cargas"].forEach(k=>{const b=REG.rows[k];if(b&&b.registros){const i0=b.colunas.indexOf("ID_Auditoria");b.registros=b.registros.filter(x=>String(x[i0])!==id);}});}
   toast("Registro excluído.");renderRecords();}
 $("f-fonte").onchange=()=>{if(regFonte()==="planilha"&&!REG.rows)carregarReg();renderRecords();};
@@ -993,7 +994,7 @@ function docsOriginais(lista,base){const docs=[],feitos=new Set();const asc=list
   asc.forEach(r=>{const aba=r._aba||"ruas";
     if(aba==="ruas"){if(r.ID_Sessao){if(feitos.has("s"+r.ID_Sessao))return;feitos.add("s"+r.ID_Sessao);const L=doGrupo(r,"ruas");docs.push({html:sessDocHTML(sessaoDe(r,L),L.slice().reverse()),multi:true});}
       else if(pbool(r.Possui_NC))docs.push({html:docHTML(r),multi:false});}
-    else if(aba==="retorno"){const k="r"+(r.ID_Sessao||r.ID_Auditoria);if(feitos.has(k))return;feitos.add(k);const L=r.ID_Sessao?doGrupo(r,"retorno"):[r];docs.push({html:retDocHTML(sessaoDe(r,L),L),multi:true});}
+    else if(aba==="retorno"){if(pbool(r.Possui_NC))docs.push({html:retNcDocHTML(r),multi:false});}
     else if(aba==="aero"){const k="a"+(r.Matricula_Operador||r.Operador)+"|"+String(r.DataHora||r.Data||"").slice(0,10);if(feitos.has(k))return;feitos.add(k);
       const L=base.filter(x=>x._aba==="aero"&&(x.Matricula_Operador||x.Operador)===(r.Matricula_Operador||r.Operador)&&String(x.DataHora||x.Data||"").slice(0,10)===String(r.DataHora||r.Data||"").slice(0,10));docs.push({html:aerDocHTML(L),multi:true});}
     else if(aba==="cargas"){const k="c"+(r.ID_Sessao||r.Numero_OS);if(feitos.has(k))return;feitos.add(k);const L=base.filter(x=>x._aba==="cargas"&&(r.ID_Sessao?x.ID_Sessao===r.ID_Sessao:x.Numero_OS===r.Numero_OS)).sort((a,b)=>a.ts-b.ts);if(L.some(x=>x.Causador==="Conferente"))docs.push({html:carDocHTML(sessaoDe(r,L),L),multi:true});}});
@@ -1009,8 +1010,9 @@ async function makePdfLista(docs){if(!window.html2canvas)await loadScript(H2C);i
           if(!primeira)pdf.addPage();pdf.addImage(pc.toDataURL("image/jpeg",.85),"JPEG",0,0,210,h*210/cv.width);primeira=false;y+=pageH-60;}}}
     finally{host.remove();}}
   return pdf.output("blob");}
-function imprimirOriginais(){const L=filtered();if(!L.length){toast("Nada para imprimir com estes filtros.");return;}
-  const base=regFonte()==="planilha"?sheetRecs():allRecs();const docs=docsOriginais(L,base);
+async function imprimirOriginais(){const L=filtered();if(!L.length){toast("Nada para imprimir com estes filtros.");return;}
+  const base=regFonte()==="planilha"?sheetRecs():allRecs();
+  if(regFonte()==="planilha"){const ids=new Set(L.map(r=>r.ID_Sessao).filter(Boolean));await carregarFotosPlanilha(base.filter(r=>L.includes(r)||(r.ID_Sessao&&ids.has(r.ID_Sessao))));}const docs=docsOriginais(L,base);
   if(!docs.length){toast("Nenhuma não conformidade com documento nestes filtros.");return;}
   if(docs.length>60&&!confirm(docs.length+" documentos. Pode demorar para gerar. Continuar?"))return;
   const per=regPeriodo();
@@ -1079,14 +1081,18 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
 const ENC_AERO={nome:"ANTONIO MAICON TEIXEIRA DE OLIVEIRA",mat:"10002407"};
 const AER_COLS=["ID_Auditoria","Data","DataHora","Matricula_Operador","Operador","Código","Descrição","Rua","O.S","Tipo de O.S","Quantidade","Vl_Ult_Entrada","Vlr. Total","Observacao","Matricula_Auditor","Nome_Auditor","Status_NC"];
 function searchOper(q){const L=searchColab(q);return L.sort((a,b)=>(/EMPILHADEIRA/.test(b.s)?1:0)-(/EMPILHADEIRA/.test(a.s)?1:0));}
-const AE={prod:null};
+const AE={prod:null,fotos:[]};
+async function addFotoAE(e){const f=e.target.files[0];e.target.value="";if(!f||AE.fotos.length>=3)return;try{AE.fotos.push(await compress(f));setErr("a-foto-f","");paintAE();}catch(x){toast("Não foi possível ler a foto.");}}
+$("a-foto").addEventListener("change",addFotoAE);$("a-foto-g").addEventListener("change",addFotoAE);
 const aOp=picker($("a-op"),{ph:"Matrícula ou nome do operador",search:searchOper,describe:descColab,novo:true,onPick:k=>{if(k!=null)store.set("audcd_aero_op",C.mat[k]);paintAE();}});
 const aProd=picker($("a-prod"),{ph:"Código ou descrição do item",search:searchProd,describe:descProd,onPick:k=>{AE.prod=k;paintAE();if(k!=null)setTimeout(()=>QW.a&&QW.a.focus(),50);}});
 document.querySelectorAll("[data-aq]").forEach(b=>b.addEventListener("click",()=>{const i=$("a-qtd");i.value=Math.max(0,(parseInt(i.value,10)||0)+ +b.dataset.aq);paintAE();}));
 $("a-qtd").addEventListener("input",paintAE);
 function aeQ(){const v=String($("a-qtd").value).trim();return v===""?0:Math.max(0,parseInt(v,10)||0);}
 function paintAE(){if(!$("a-valor"))return;if(window.QW&&QW.a)QW.a.refresh();const vl=AE.prod!=null?P.vl[AE.prod]:0,q=aeQ();
-  $("a-valor").textContent=BRL.format(q*vl);$("a-calc").textContent=q+" un × "+BRL.format(vl)+" (Vl. ult. entrada 286)";$("a-data").textContent=fmtDT(new Date()).slice(0,10);listaAE();}
+  $("a-valor").textContent=BRL.format(q*vl);$("a-calc").textContent=q+" un × "+BRL.format(vl)+" (Vl. ult. entrada 286)";$("a-data").textContent=fmtDT(new Date()).slice(0,10);
+  const fb=$("a-fotos");fb.innerHTML=AE.fotos.map((s,i)=>'<div class="ph-it"><img src="'+s+'" alt="Foto '+(i+1)+'"><button type="button" data-i="'+i+'" aria-label="Remover foto">×</button></div>').join("");
+  fb.querySelectorAll("button").forEach(b=>b.onclick=()=>{AE.fotos.splice(+b.dataset.i,1);paintAE();});$("a-cam").hidden=$("a-gal").hidden=AE.fotos.length>=3;listaAE();}
 function aeHoje(){const t0=new Date();t0.setHours(0,0,0,0);return allRecs().filter(r=>r._aba==="aero"&&r.ts>=t0.getTime()&&r.Matricula_Auditor===auditor).sort((a,b)=>b.ts-a.ts);}
 function listaAE(){const L=aeHoje();const g={};L.forEach(r=>{(g[r.Matricula_Operador]=g[r.Matricula_Operador]||[]).push(r);});
   $("a-list").innerHTML=L.length?'<div class="block"><h3>Lançamentos de hoje <small>'+L.length+'</small></h3>'+
@@ -1095,17 +1101,17 @@ function listaAE(){const L=aeHoje();const g={};L.forEach(r=>{(g[r.Matricula_Oper
       '<div><div class="v">'+esc(r.Quantidade)+' un<br>'+BRL.format(+r["Vlr. Total"]||0)+'</div><div class="act"><button type="button" class="btn sm" data-ax="'+esc(r.ID_Auditoria)+'">Excluir</button></div></div></div>').join("")+'</div>':"";
   $("a-list").querySelectorAll("[data-anc]").forEach(b=>b.onclick=()=>{const rs=L.filter(r=>r.Matricula_Operador===b.dataset.anc);openAerDoc(rs);});
   $("a-list").querySelectorAll("[data-ax]").forEach(b=>b.onclick=()=>delRec(b.dataset.ax).then(()=>paintAE()));}
-function resetAE(){aProd.clear();AE.prod=null;["a-rua","a-os","a-tipo","a-obs"].forEach(i=>$(i).value="");$("a-qtd").value="";if(window.QW&&QW.a)QW.a.reset();document.querySelectorAll("#v-aero .field.bad").forEach(f=>setErr(f.id,""));paintAE();}
+function resetAE(){aProd.clear();AE.prod=null;AE.fotos=[];["a-rua","a-os","a-tipo","a-obs"].forEach(i=>$(i).value="");$("a-qtd").value="";if(window.QW&&QW.a)QW.a.reset();document.querySelectorAll("#v-aero .field.bad").forEach(f=>setErr(f.id,""));paintAE();}
 $("a-save").addEventListener("click",async()=>{
   if(!auditor){toast("Faça login primeiro.");return;}
   const errs=[],chk=(c,f,m)=>{setErr(f,c?m:"");if(c)errs.push(f);};const q=aeQ(),rua=$("a-rua").value.replace(/\D/g,""),os=$("a-os").value.replace(/\D/g,""),tipo=$("a-tipo").value.trim();
   chk(aOp.value==null,"a-op-f","Informe o operador.");chk(AE.prod==null,"a-prod-f","Informe o item.");chk(!rua,"a-rua-f","Informe a rua.");chk(!os,"a-os-f","Informe a O.S.");
-  chk(!tipo,"a-tipo-f","Informe o tipo de O.S.");chk(!(q>0),"a-qtd-f","Informe a quantidade encontrada.");
+  chk(!tipo,"a-tipo-f","Informe o tipo de O.S.");chk(!(q>0),"a-qtd-f","Informe a quantidade encontrada.");chk(!AE.fotos.length,"a-foto-f","Tire ao menos uma foto da ocorrência.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
   const now=new Date(),k=AE.prod,vl=P.vl[k],oi=aOp.value;
   const rec={_aba:"aero",ID_Auditoria:newId("AE"),Data:fmtDT(now).slice(0,10),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Operador:C.mat[oi],Operador:C.nome[oi],
     "Código":P.cod[k],"Descrição":P.desc[k],Rua:String(+rua),"O.S":os,"Tipo de O.S":tipo,Quantidade:q,Vl_Ult_Entrada:vl,"Vlr. Total":Math.round(q*vl*100)/100,
-    Observacao:$("a-obs").value.trim(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),Possui_NC:true,Status_NC:"Aberta"};
+    Observacao:$("a-obs").value.trim(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),Possui_NC:true,Status_NC:"Aberta",fotos:AE.fotos.slice()};
   $("a-save").disabled=true;const ok=await saveRec(rec);$("a-save").disabled=false;resetAE();window.scrollTo(0,0);
   toast((ok||dbState==="off"?"Lançamento salvo":"Salvo neste aparelho, envio pendente")+" – "+BRL.format(rec["Vlr. Total"])+".");aProd.focus();});
 function aerDocHTML(L){L=L.slice().sort((a,b)=>a.ts-b.ts);const f=L[0],tot=L.reduce((a,r)=>a+(+r["Vlr. Total"]||pnum(r["Vlr. Total"])||0),0),un=L.reduce((a,r)=>a+(+r.Quantidade||pnum(r.Quantidade)||0),0);
@@ -1118,6 +1124,8 @@ function aerDocHTML(L){L=L.slice().sort((a,b)=>a.ts-b.ts);const f=L[0],tot=L.red
    '</tbody><tfoot><tr><td colspan="5">Total</td><td class="n">'+un+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
    '<p class="decl" style="margin-top:6px">Valor total = quantidade encontrada × Vl. ult. entrada da base 286.</p>'+
    (obs.length?'<h2>Observações</h2><div class="obs">'+esc(obs.join("\n"))+'</div>':'')+
+   fotosHTML(L.flatMap(r=>(r.fotos||[]).map(s=>({s,c:r["Código"]+" · Rua "+r.Rua}))))+
+   termoHTML([TERMO_TXT.aero],tot)+
    '<p class="decl">Declaro ciência das não conformidades registradas na auditoria da operação aéreo.</p>'+
    '<div class="sg"><div><b>Operador</b>'+esc(f.Operador||"")+'<small>Matrícula '+esc(f.Matricula_Operador||"")+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(f.Nome_Auditor||"")+'<small>Matrícula '+esc(f.Matricula_Auditor||"")+'</small><small>Data: ___/___/______</small></div>'+
@@ -1169,6 +1177,59 @@ $("bs-file").addEventListener("change",async e=>{const file=e.target.files[0];e.
 function dedupSobras(L){const m=new Map();L.slice().sort((x,y)=>String(x[0])<String(y[0])?-1:1).forEach(a=>{const k=String(a[1])+"|"+String(a[2])+"|"+(a[12]||"Sobra")+"|"+(a[7]||a[8]||"");if(!m.has(k))m.set(k,a);});return [...m.values()];}
 IDB.get("sobras").then(c=>{if(c&&c.rows&&!SOBRAS.length){SOBRAS=dedupSobras(c.rows.filter(a=>(a[12]||"Sobra")==="Sobra"));SOBINFO=c.info;}}).catch(()=>{});
 
+
+// termo de impacto, NC individual do retorno e fotos vindas da planilha
+const TERMO_TXT={
+ ret_div:["Divergência de quantidade no retorno","A quantidade física difere da etiqueta. Gera diferença entre estoque físico e sistema, cortes ou sobras na separação seguinte e retrabalho de inventário."],
+ ret_venc:["Retorno próximo do vencimento","Produto devolvido ao picking com validade próxima. Sem giro imediato vira perda por vencimento e há risco de expedir produto vencido ao cliente."],
+ ret_nc:["Retorno fora do padrão","Retorno feito sem seguir o procedimento (identificação, endereço ou condição do produto). Compromete a acuracidade do endereço e a separação dos próximos pedidos."],
+ "car_Falta":["Falta na carga","O cliente recebe o pedido incompleto. Gera reclamação, reentrega, custo logístico adicional e perda de nível de serviço."],
+ "car_Avaria":["Avaria na carga","Produto danificado expedido ou identificado na carga. Risco de devolução, prejuízo financeiro e desgaste da imagem da empresa com o cliente."],
+ "car_Abastecimento":["Falha de abastecimento","O produto não estava disponível no momento da carga. Atrasa a expedição e pode gerar corte no pedido do cliente."],
+ "car_Sobras":["Sobra na carga","O cliente recebe mais do que pediu. Gera perda de estoque, divergência de faturamento e custo para recolher o excedente."],
+ "car_Produto trocado":["Produto trocado","O cliente recebe um item diferente do pedido. Gera devolução, reentrega, divergência de estoque nos dois itens e insatisfação do cliente."],
+ aero:["Ocorrência na operação aérea","Abastecimento ou armazenagem incorreta pela empilhadeira afeta a disponibilidade no picking, a acuracidade do estoque e a segurança da operação."]};
+function termoHTML(itens,valor,extra){if(!itens.length)return "";
+  return '<div class="termo"><h2>Termo de impacto da não conformidade</h2><p>A auditoria identificou a(s) não conformidade(s) abaixo. Impacto para a operação:</p><ul>'+
+    itens.map(([t,x])=>'<li><b>'+esc(t)+'.</b> '+esc(x)+'</li>').join("")+'</ul>'+
+    '<p><b>Valor envolvido: '+BRL.format(Math.abs(+valor||0))+'.</b> '+(extra||"")+'Este registro tem finalidade de orientação, correção do processo e prevenção de reincidência.</p></div>';}
+function fotosHTML(L,leg){const ok=L.filter(x=>x&&x.s);return ok.length?'<h2>Registro fotográfico</h2><div class="fg">'+ok.map(x=>'<figure><img src="'+x.s+'" alt="'+esc(x.c||leg||"Foto")+'"><figcaption>'+esc(x.c||leg||"")+'</figcaption></figure>').join("")+'</div>':'<p class="decl" style="color:#B45309">Foto não disponível para esta não conformidade.</p>';}
+function retOcs(r){const o=[];const d=+r.Divergencia_Un||pnum(r.Divergencia_Un);if(d)o.push(TERMO_TXT.ret_div);if(pbool(r.Prox_Vencimento))o.push(TERMO_TXT.ret_venc);
+  if(r.Retorno_NC||(pbool(r.Possui_NC)&&!d&&!pbool(r.Prox_Vencimento)))o.push(TERMO_TXT.ret_nc);return o;}
+function retNcDocHTML(r){const row=(k,v)=>'<tr><td class="k">'+k+'</td><td>'+(v===""||v==null?"–":esc(v))+'</td></tr>';
+  const qe=pnum(r.Qtd_Etiqueta),qf=pnum(r.Qtd_Fisico),d=pnum(r.Divergencia_Un),vl=pnum(r.Vl_Ult_Entrada)||(qf?pnum(r.Valor_Total)/qf:0),vd=pnum(r.Valor_Divergencia);
+  const oc=retOcs(r);
+  return '<div class="pd"><div class="pd-h"><img src="'+LOGO_BLUE+'" alt="Santa Therezinha"><div class="r"><h1>Não conformidade – Auditoria de retorno</h1><p>Rua '+esc(unz(r.Rua))+' · Nº '+esc(r.ID_Auditoria)+'</p></div></div>'+
+   '<h2>Identificação</h2><table>'+row("Data/hora",r.DataHora)+row("Rua",unz(r.Rua))+row("O.S.",r.Numero_OS||"")+row("Auditor",(r.Nome_Auditor||"")+" – matrícula "+(r.Matricula_Auditor||""))+
+   row("Repositor responsável",(r.Nome_Colaborador_NC||"")+" – matrícula "+(r.Matricula_Colaborador_NC||"")+(r.Funcao_Colaborador_NC?" ("+r.Funcao_Colaborador_NC+")":""))+row("Status",r.Status_NC||"Aberta")+'</table>'+
+   '<h2>Item com não conformidade</h2><table class="lt"><thead><tr><th>Item</th><th>Etiqueta</th><th>Físico</th><th>Dif.</th><th>Vl. un.</th><th>Valor div.</th></tr></thead><tbody><tr><td>'+esc(r.Produto+" – "+r.Descricao_Produto)+'</td><td class="n">'+qe+'</td><td class="n">'+qf+'</td><td class="n">'+(d>0?"+":"")+d+'</td><td class="n">'+BRL.format(vl)+'</td><td class="n">'+BRL.format(vd)+'</td></tr></tbody></table>'+
+   (pbool(r.Prox_Vencimento)?'<p class="decl">Vencimento encontrado: <b>'+esc(r.Data_Vencimento||"")+'</b>.</p>':'')+
+   '<h2>Ocorrência</h2><ul class="ocx">'+oc.map(([t])=>'<li><b>'+esc(t)+'</b></li>').join("")+'</ul>'+(r.Observacao?'<div class="obs">'+esc(r.Observacao)+'</div>':'')+
+   fotosHTML([{s:r.foto_retorno,c:"Foto do retorno"},{s:r.foto_etiqueta,c:"Foto da etiqueta"}])+
+   termoHTML(oc,vd)+
+   '<p class="decl">Declaro ciência da não conformidade registrada acima e das informações de quantidade e valor apuradas na auditoria do retorno.</p>'+
+   '<div class="sg"><div><b>Repositor</b>'+esc(r.Nome_Colaborador_NC||"")+'<small>Matrícula '+esc(r.Matricula_Colaborador_NC||"")+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Auditor</b>'+esc(r.Nome_Auditor||"")+'<small>Matrícula '+esc(r.Matricula_Auditor||"")+'</small><small>Data: ___/___/______</small></div>'+
+   '<div><b>Encarregado do setor de reposição</b>FABIO NYCKOLAS FIGUEIREDO BOTERO<small>Matrícula 10003993</small><small>Data: ___/___/______</small></div></div></div>';}
+function retText(S,recs){const L=recs.filter(r=>pbool(r.Possui_NC)),vd=L.reduce((a,r)=>a+pnum(r.Valor_Divergencia),0);
+  return ["*NÃO CONFORMIDADES – RETORNO RUA "+S.rua+"*","Auditor: "+(S.audNome||"")+" ("+S.aud+")",L.length+" não conformidade(s), uma por item","*Valor da divergência: "+BRL.format(vd)+"*"].join("\n");}
+function openRetDoc(S,recs,onClose){const L=recs.filter(r=>pbool(r.Possui_NC)).sort((a,b)=>a.ts-b.ts);
+  if(!L.length){toast("Nenhum item com não conformidade nesta rua.");if(onClose)onClose();return;}
+  const docs=L.map(r=>({html:retNcDocHTML(r),multi:false}));
+  openDoc({html:docs.map(d=>'<div class="docsep">'+d.html+'</div>').join(""),pdfDocs:docs,multi:true,name:"NC_Retorno_Rua"+S.rua+"_"+S.id+".pdf",title:"NCs do retorno – Rua "+S.rua+" ("+L.length+")",
+    short:"Não conformidades do retorno – Rua "+S.rua+" – "+L.length+" NC",text:retText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
+// fotos guardadas no Drive (lidas pela planilha)
+const FOTO_CACHE={};
+const idDrive=u=>{const m=String(u||"").match(/\/d\/([\w-]{10,})|[?&]id=([\w-]{10,})/);return m?(m[1]||m[2]):"";};
+async function carregarFotosPlanilha(recs){const precisa=recs.filter(r=>r._sheet&&!r._fotosOk);if(!precisa.length||DEMO||!SHEET_URL||!navigator.onLine)return;
+  const ids=new Set();precisa.forEach(r=>{String(r.Links_Fotos||"").split(/\s+/).concat([r.Foto_Retorno,r.Foto_Etiqueta]).forEach(u=>{const i=idDrive(u);if(i&&!FOTO_CACHE[i])ids.add(i);});});
+  const lista=[...ids];if(lista.length)toast("Carregando "+lista.length+" foto(s) da planilha…");
+  for(let i=0;i<lista.length;i+=12){try{const r=await fetch(SHEET_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({acao:"fotos",token:LOGIN.token,ids:lista.slice(i,i+12)}),redirect:"follow",cache:"no-store"});
+    const j=await r.json();if(j&&j.ok)Object.assign(FOTO_CACHE,j.fotos||{});}catch(e){}}
+  precisa.forEach(r=>{const links=String(r.Links_Fotos||"").split(/\s+/).map(idDrive).filter(Boolean).map(i=>FOTO_CACHE[i]).filter(Boolean);
+    if(r._aba==="retorno"){r.foto_retorno=FOTO_CACHE[idDrive(r.Foto_Retorno)]||r.foto_retorno||links[0]||"";r.foto_etiqueta=FOTO_CACHE[idDrive(r.Foto_Etiqueta)]||r.foto_etiqueta||(idDrive(r.Foto_Retorno)?"":links[1])||"";}
+    else r.fotos=links;r._fotosOk=true;});}
+function regBase(){return regFonte()==="planilha"?sheetRecs():allRecs();}
 
 // auditoria de retorno (por rua, vários lançamentos)
 let SR=store.get("audcd_sessao_ret",null);
@@ -1222,7 +1283,7 @@ function renderRS(){const box=$("rs-box");if(!box)return;
   const recs=retRecs(),ncs=recs.filter(r=>r.Possui_NC),tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0),vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
   box.innerHTML='<div class="sess-top"><div><h3>Retorno · Rua '+esc(SR.rua)+'</h3><div class="note" style="margin:4px 0 0">Repositor: <b>'+esc(SR.repNome)+'</b> · '+esc(SR.rep)+'</div></div><button type="button" class="link" id="rs-chg">Trocar repositor</button></div>'+
     '<div class="sess-stats" style="margin-top:10px"><span><b>'+recs.length+'</b> ite'+(recs.length===1?'m':'ns')+'</span><span><b>'+ncs.length+'</b> NC</span><span><b>'+BRL.format(tot)+'</b> no retorno</span><span><b class="'+(vdiv<0?'q1-t':vdiv>0?'q3-t':'')+'">'+BRL.format(vdiv)+'</b> em divergência</span></div>'+
-    '<div id="rs-chg-box"></div><div class="row-btns"><button type="button" class="btn" id="rs-rel">Ver relatório</button><button type="button" class="btn" id="rs-end">Finalizar rua</button></div>';
+    '<div id="rs-chg-box"></div><div class="row-btns"><button type="button" class="btn" id="rs-rel">Imprimir NCs</button><button type="button" class="btn" id="rs-end">Finalizar rua</button></div>';
   $("rs-rel").onclick=()=>{if(!recs.length){toast("Nenhum item lançado ainda.");return;}openRetDoc(SR,recs);};
   $("rs-end").onclick=()=>{if(!recs.length){if(confirm("Nenhum item lançado. Encerrar mesmo assim?")){SR=null;store.set("audcd_sessao_ret",null);resetRT();renderRS();}return;}
     const s0=SR;openRetDoc(s0,recs,()=>{SR=null;store.set("audcd_sessao_ret",null);resetRT();renderRS();toast("Retorno da rua "+s0.rua+" finalizado.");});};
@@ -1292,11 +1353,7 @@ function retDocHTML(S,recs){const L=recs.slice().sort((a,b)=>a.ts-b.ts);const nc
    '<div class="sg"><div><b>Repositor</b>'+esc(S.repNome)+'<small>Matrícula '+esc(S.rep)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(S.audNome||"")+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Encarregado do setor de reposição</b>FABIO NYCKOLAS FIGUEIREDO BOTERO<small>Matrícula 10003993</small><small>Data: ___/___/______</small></div></div></div>';}
-function retText(S,recs){const ncs=recs.filter(r=>r.Possui_NC);const tot=recs.reduce((a,r)=>a+(+r.Valor_Total||0),0),vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
-  return ["*AUDITORIA DE RETORNO – Rua "+S.rua+"*","Nº "+S.id,"Auditor: "+(S.audNome||"")+" ("+S.aud+")","Repositor: "+S.repNome+" ("+S.rep+")",recs.length+" itens · "+ncs.length+" NC","Valor total (físico): "+BRL.format(tot),"*Valor da divergência: "+BRL.format(vdiv)+"*"].join("\n");}
-function openRetDoc(S,recs,onClose){const vdiv=recs.reduce((a,r)=>a+(+r.Valor_Divergencia||0),0);
-  openDoc({html:retDocHTML(S,recs),multi:true,name:"Retorno_Rua"+S.rua+"_"+S.id+".pdf",title:"Auditoria de retorno – Rua "+S.rua,
-    short:"Auditoria de retorno – Rua "+S.rua+" – "+recs.length+" itens – divergência "+BRL.format(vdiv),text:retText(S,recs),onClose,closeLabel:onClose?"Concluir":"Fechar"});}
+
 
 // auditoria de cargas
 let SC=store.get("audcd_sessao_car",null);
@@ -1312,7 +1369,7 @@ document.querySelectorAll(".cau button").forEach(b=>b.addEventListener("click",(
 async function addFotoCG(e){const f=e.target.files[0];e.target.value="";if(!f||CG.fotos.length>=3)return;try{CG.fotos.push(await compress(f));setErr("g-foto-f","");paintCG();}catch(x){toast("Não foi possível ler a foto.");}}
 $("g-foto").addEventListener("change",addFotoCG);$("g-foto-g").addEventListener("change",addFotoCG);
 function carRecs(){return SC?allRecs().filter(r=>r._aba==="cargas"&&r.ID_Sessao===SC.id):[];}
-function porMotivo(recs){const m={Falta:{n:0,q:0,v:0},Avaria:{n:0,q:0,v:0},Abastecimento:{n:0,q:0,v:0},Sobras:{n:0,q:0,v:0}};recs.forEach(r=>{const x=m[r.Motivo];if(x){x.n++;x.q+=+r.Quantidade||0;x.v+=+r.Valor_Total||0;}});return m;}
+function porMotivo(recs){const m={Falta:{n:0,q:0,v:0},Avaria:{n:0,q:0,v:0},Abastecimento:{n:0,q:0,v:0},Sobras:{n:0,q:0,v:0},"Produto trocado":{n:0,q:0,v:0}};recs.forEach(r=>{const x=m[r.Motivo];if(x){x.n++;x.q+=+r.Quantidade||0;x.v+=+r.Valor_Total||0;}});return m;}
 function renderCS(){const box=$("cs-box");if(!box)return;
   if(!SC){$("cg-form").hidden=true;$("g-list").innerHTML="";if(box.dataset.mode==="start")return;box.dataset.mode="start";
     box.innerHTML='<h3>Conferência da carga</h3><p class="note" style="margin-top:0">Informe Box, O.S. e conferente uma vez e lance todos os itens com ocorrência. No fim, finalize para gerar o PDF.</p>'+
@@ -1353,7 +1410,7 @@ function paintCG(){if(!$("g-info"))return;if(window.QW&&QW.g)QW.g.refresh();rend
   document.querySelectorAll(".cau button").forEach(b=>b.setAttribute("aria-checked",b.dataset.c===CG.cau));
   $("g-sep-w").hidden=CG.cau!=="Separador";
   $("g-cau-h").textContent=CG.cau==="Conferente"&&SC?"Ocorrência atribuída ao conferente "+curto(SC.confNome)+".":CG.cau==="Separador"?"Escolha quem separou o item.":"";
-  $("g-foto-f").hidden=CG.mot!=="Sobras";
+  $("g-foto-f").hidden=!CG.mot;
   const box=$("g-fotos");box.innerHTML=CG.fotos.map((s,i)=>'<div class="ph-it"><img src="'+s+'" alt="Foto '+(i+1)+'"><button type="button" data-i="'+i+'" aria-label="Remover foto">×</button></div>').join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>{CG.fotos.splice(+b.dataset.i,1);paintCG();});
   $("g-cam").hidden=$("g-gal").hidden=CG.fotos.length>=3;}
@@ -1366,13 +1423,13 @@ $("g-save").addEventListener("click",async()=>{
   chk(!CG.mot,"g-mot-f","Escolha o motivo.");
   chk(!CG.cau,"g-cau-f","Escolha o causador da ocorrência.");
   chk(CG.cau==="Separador"&&gSep.value==null,"g-cau-f","Informe o separador.");
-  chk(CG.mot==="Sobras"&&!CG.fotos.length,"g-foto-f","Tire ao menos uma foto da sobra.");
+  chk(CG.mot&&!CG.fotos.length,"g-foto-f","Tire ao menos uma foto da ocorrência.");
   if(errs.length){$(errs[0]).scrollIntoView({block:"center",behavior:"smooth"});toast("Revise os campos marcados.");return;}
   const now=new Date(),k=CG.prod,vl=P.vl[k];
   const rec={_aba:"cargas",ID_Auditoria:newId("CG"),DataHora:fmtDT(now),ts:now.getTime(),Matricula_Auditor:auditor,Nome_Auditor:nomeAud(),
     Matricula_Conferente:SC.conf,Nome_Conferente:SC.confNome,Box:SC.box,Numero_OS:SC.os,Codigo_Produto:P.cod[k],Descricao_Produto:P.desc[k],
     Quantidade:q,Motivo:CG.mot,Causador:CG.cau,Matricula_Causador:CG.cau==="Separador"?C.mat[gSep.value]:SC.conf,Nome_Causador:CG.cau==="Separador"?C.nome[gSep.value]:SC.confNome,Valor_Total:Math.round(q*vl*100)/100,Vl_Unit:vl,Possui_NC:true,ID_Sessao:SC.id,
-    Sessao:{id:SC.id,box:SC.box,os:SC.os,conf:SC.conf,confNome:SC.confNome,aud:SC.aud,audNome:SC.audNome},fotos:CG.mot==="Sobras"?CG.fotos.slice():[]};
+    Sessao:{id:SC.id,box:SC.box,os:SC.os,conf:SC.conf,confNome:SC.confNome,aud:SC.aud,audNome:SC.audNome},fotos:CG.fotos.slice()};
   $("g-save").disabled=true;const ok=await saveRec(rec);$("g-save").disabled=false;
   resetCG();window.scrollTo(0,0);toast((ok||dbState==="off"?"Item salvo":"Salvo neste aparelho, envio pendente")+" – "+rec.Motivo+".");gProd.focus();
 });
@@ -1389,6 +1446,8 @@ function carDocHTML(S,recs){const L=recs.filter(ehDoConf).sort((a,b)=>a.ts-b.ts)
    L.map(r=>{const q=+r.Quantidade||pnum(r.Quantidade)||0,v=+r.Valor_Total||pnum(r.Valor_Total)||0;return '<tr><td>'+esc(r.Codigo_Produto+" – "+r.Descricao_Produto)+'</td><td>'+esc(r.Motivo)+'</td><td class="n">'+q+'</td><td class="n">'+BRL.format(+r.Vl_Unit||(q?v/q:0))+'</td><td class="n">'+BRL.format(v)+'</td></tr>';}).join("")+
    '</tbody><tfoot><tr><td colspan="2">Total</td><td class="n">'+un+'</td><td></td><td class="n">'+BRL.format(tot)+'</td></tr></tfoot></table>'+
    '<p class="decl" style="margin-top:6px">Valores pelo Vl. ult. entrada da base 286.</p>'+
+   fotosHTML(L.flatMap(r=>(r.fotos||[]).map(s=>({s,c:r.Codigo_Produto+" · "+r.Motivo}))))+
+   termoHTML([...new Set(L.map(r=>r.Motivo))].map(m=>TERMO_TXT["car_"+m]).filter(Boolean),tot)+
    '<p class="decl">Declaro ciência das não conformidades de minha responsabilidade registradas na auditoria da carga da O.S. '+esc(S.os)+', box '+esc(S.box)+'.</p>'+
    '<div class="sg"><div><b>Conferente</b>'+esc(S.confNome)+'<small>Matrícula '+esc(S.conf)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(S.audNome||"")+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
@@ -1604,6 +1663,7 @@ function docHTML(r){
    '<h2>Divergência</h2><table>'+row("Item",r.Produto+" – "+r.Descricao_Produto)+row("Unidades encontradas",r.Qtd_Divergencia_Un+" un")+row("Valor unitário (últ. entrada)",BRL.format(vl))+'</table>'+
    '<div class="tot"><span>Valor real da divergência<br><small>'+esc(r.Qtd_Divergencia_Un)+' un × '+BRL.format(vl)+'</small></span><b>'+BRL.format(tot)+'</b></div>'+
    '<h2>Observação</h2><div class="obw"><div class="obs">'+esc(r.Observacao||"–")+'</div>'+((r.fotos&&r.fotos.length)||r.foto?'<div class="phs">'+((r.fotos&&r.fotos.length)?r.fotos:[r.foto]).map(s=>'<img class="ph" src="'+s+'" alt="Foto do endereço">').join("")+'</div>':'')+'</div>'+
+   termoHTML(ocList(r).map(([k])=>[OC_TXT[k][0],OC_TXT[k][1]]),+r.Valor_Divergencia||pnum(r.Valor_Divergencia))+
    '<p class="decl">Declaro ciência da não conformidade registrada acima e das informações de quantidade e valor apuradas na auditoria.</p>'+
    '<div class="sg"><div><b>Repositor</b>'+esc(r.Nome_Colaborador_NC||"")+'<small>Matrícula '+esc(r.Matricula_Colaborador_NC||"")+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(r.Nome_Auditor)+'<small>Matrícula '+esc(r.Matricula_Auditor)+'</small><small>Data: ___/___/______</small></div>'+
@@ -1613,7 +1673,7 @@ const FIT_JS='function stFit(el){var c=el.cloneNode(true);c.style.cssText="posit
 (new Function(FIT_JS+';window.stFit=stFit;'))();
 function fitWhenReady(el,cb){const imgs=[...el.querySelectorAll("img")].filter(i=>!i.complete);let n=imgs.length;const go=()=>{window.stFit(el);cb&&cb();};if(!n){go();return;}imgs.forEach(i=>{i.onload=i.onerror=()=>{if(--n===0)go();};});}
 // relatório consolidado da rua
-const SCSS='.pd .sg{row-gap:40px}.pd .fg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pd .fg figure{margin:0;page-break-inside:avoid;break-inside:avoid}.pd .fg img{display:block;width:100%;height:36mm;object-fit:cover;border:1px solid #C9D6EA}.pd .fg figcaption{font-size:9.5px;color:#4F6380;margin-top:2px;line-height:1.2}'+
+const SCSS='.pd .termo{border:1px solid #F3CFCB;background:#FDF3F2;border-radius:6px;padding:6px 12px 8px;margin-top:10px;break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}.pd .termo h2{margin:4px 0 4px;color:#9F1D14}.pd .termo p{margin:4px 0}.pd .termo ul{margin:4px 0 4px 18px;padding:0}.pd .termo li{margin:2px 0}.pd .sg{row-gap:40px}.pd .fg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.pd .fg figure{margin:0;page-break-inside:avoid;break-inside:avoid}.pd .fg img{display:block;width:100%;height:36mm;object-fit:cover;border:1px solid #C9D6EA}.pd .fg figcaption{font-size:9.5px;color:#4F6380;margin-top:2px;line-height:1.2}'+
  '.pd .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.pd .sum div{border:1px solid #C9D6EA;padding:6px;text-align:center}.pd .sum b{display:block;font-size:16px;color:#0A4DA2}.pd .sum span{font-size:10px;color:#4F6380}'+
  '.pd .lt th{background:#0A4DA2;color:#fff;font-size:10.5px;text-align:left;padding:4px 6px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.pd .lt td{font-size:10.5px}.pd .lt tr{page-break-inside:avoid}.pd .lt td.n{text-align:right;white-space:nowrap}.pd .lt tfoot td{font-weight:bold;background:#F2F6FC}'+
  '.pd .leg li{border-left-width:3px}';
@@ -1635,6 +1695,7 @@ function sessDocHTML(S,recs){
    (function(){const pics=[];recs.slice().reverse().forEach(r=>{const fs=(r.fotos&&r.fotos.length)?r.fotos:(r.foto?[r.foto]:[]);fs.forEach(s=>pics.push({s,a:fmtAddr(r.Endereco),i:r.Produto,nc:r.Possui_NC}));});
      return pics.length?'<h2>Registro fotográfico</h2><div class="fg">'+pics.map(x=>'<figure><img src="'+x.s+'" alt="Foto do endereço '+esc(x.a)+'"><figcaption><b>'+esc(x.a)+'</b> · '+esc(x.i)+(x.nc?' · NC':' · conforme')+'</figcaption></figure>').join("")+'</div>':'';})()+
    (Object.keys(used).length?'<h2>Por que cada ocorrência importa</h2><ul class="ocx leg">'+Object.keys(used).map(k=>'<li><b>'+OC_TXT[k][0]+'</b><p>'+OC_TXT[k][1]+'</p></li>').join("")+'</ul>':'')+
+   termoHTML(Object.keys(used).map(k=>[OC_TXT[k][0],OC_TXT[k][1]]),tot)+
    '<p class="decl">Declaro ciência das não conformidades registradas acima e das informações de quantidade e valor apuradas na auditoria da rua '+esc(S.rua)+'.</p>'+
    '<div class="sg"><div><b>Repositor</b>'+esc(S.repNome)+'<small>Matrícula '+esc(S.rep)+'</small><small>Data: ___/___/______</small></div>'+
    '<div><b>Auditor</b>'+esc(S.audNome)+'<small>Matrícula '+esc(S.aud)+'</small><small>Data: ___/___/______</small></div>'+
