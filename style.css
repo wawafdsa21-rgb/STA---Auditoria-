@@ -357,6 +357,9 @@ nav[data-n="9"] button{font-size:.64rem!important;letter-spacing:-.03em}
 .fxbar .fx-tabs{display:grid;grid-auto-flow:column;grid-auto-columns:auto;margin:0}.fxbar .fx-tabs button{padding:0 14px}
 .fxbar label{display:flex;align-items:center;gap:6px;font-weight:600;font-size:.9rem}.fxbar .in{min-height:44px;padding:6px 8px;width:auto}
 .fx-row{display:grid;gap:10px;margin-top:10px;align-items:stretch}.fx-row>.fx-c{min-width:0}
+.fx-bars-m .fx-br{grid-template-columns:14px minmax(0,1fr) 44px 112px}
+.fx-k1{margin-bottom:0!important}.fx-k2{margin-top:8px!important}
+.fx-k b{overflow:hidden;text-overflow:ellipsis}
 .fx-bars-w .fx-br{grid-template-columns:14px 150px 1fr 128px}
 .fx-bars-s .fx-br{grid-template-columns:14px 1fr 70px 30px}
 .fx-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:start}
