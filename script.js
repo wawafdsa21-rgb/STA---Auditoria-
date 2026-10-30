@@ -805,7 +805,7 @@ function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r
       '<p class="fx-e" style="margin-top:6px">O.S. = retornos da rotina 8457 na rua (RUA_O). Retornos contados = itens auditados na rua. % conferido = retornos contados ÷ O.S. da rotina.</p>';})();
   return fxHead(tit,rows.length).replace('Total de registros:','Auditores: <b>'+esc(audNomes)+'</b><br>Total de registros:')+
     fxKpis([{t:"Itens auditados",v:rows.length},{t:"Conformidade",v:pc1(q),c:q==null?"#64748B":FXC[fxCls(q)],s:conf+" conformes"},{t:"Não conformidades",v:rows.length-conf,c:"#DC2626",s:venc+" vencendo · "+div+" com divergência"},
-      {t:"O.S. auditadas × rotina",v:rows.length+" / "+rot.length,c:"#0E7490",s:rot.length?pc1(Math.min(1,rows.length/rot.length))+" das O.S. da rotina":"rotina 8457 não importada"},
+      
       {t:"Ruas com retorno",v:Object.values(porRua).filter(x=>x.n).length,c:"#0F172A",s:crit.length+" abaixo de 85%",sc:crit.length?"#DC2626":"#64748B"},
       {t:"Valor da divergência",v:BRL0(vd),c:vd<0?"#DC2626":vd>0?"#B45309":"#16A34A"}],true)+
     '<div class="fx-g"><div class="fx-col">'+fxCard("Conformidade do retorno por bloco",fxMapa(qRua,"Percentual = itens conformes ÷ itens auditados na rua."))+'</div>'+
