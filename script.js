@@ -746,6 +746,10 @@ function fxTable(head,rows){return rows.length?'<table class="fx-t"><thead><tr>'
 function fxFoot(tit){return '<div class="fx-f"><span>'+esc(tit)+' · Ciclo: '+fdISO(FECH.de)+' a '+fdISO(FECH.ate)+'</span><span>Gerado em '+fmtDT(new Date())+' · Santa Therezinha</span></div>';}
 function porDia(rows,fn){const m={};rows.forEach(r=>{const k=fxDiaKey(r.ts);(m[k]=m[k]||{ts:r.ts,rows:[]}).rows.push(r);});return Object.keys(m).sort().slice(-14).map(k=>fn(m[k]));}
 
+/* causador da ocorrência de carga: se for o conferente, vale o conferente da carga (colunas Matricula_Conferente/Nome_Conferente);
+   o nome vem da base de funcionários pela matrícula, para refletir correções feitas na planilha */
+function causadorDe(r){const conf=r.Causador!=="Separador";const m=String((conf?(r.Matricula_Conferente||r.Matricula_Causador):(r.Matricula_Causador))||"").trim();
+  const nb=m&&cIdx.has(m)?C.nome[cIdx.get(m)]:"";return {m,n:nb||(conf?(r.Nome_Conferente||r.Nome_Causador):r.Nome_Causador)||""};}
 /* ---- gráfico de linha ---- */
 function fxLine(pts,cor,unid,HH){if(!pts.length)return '<p class="fx-e">Sem dados.</p>';const W=1040,H=HH||170,pl=34,pr=10,pt=18,pb=26,mx=Math.max(...pts.map(p=>p.v),1);
   const x=i=>pl+(pts.length===1?(W-pl-pr)/2:i*(W-pl-pr)/(pts.length-1)),y=v=>pt+(1-v/mx)*(H-pt-pb);
@@ -820,7 +824,7 @@ function fxCar(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.cargas).map(r=>Ob
   const oss=new Set(rows.map(r=>r.Numero_OS)),tot=rows.reduce((a,r)=>a+r._v,0),pct=v=>tot?" · "+Math.round(v/tot*100)+"% do valor":"";
   const itens={};rows.forEach(r=>{const k=r.Codigo_Produto;const x=itens[k]=itens[k]||{d:r.Descricao_Produto,n:0,q:0,v:0,mot:{}};x.n++;x.q+=r._q;x.v+=r._v;x.mot[r.Motivo]=(x.mot[r.Motivo]||0)+1;});
   const rankItens=Object.entries(itens).sort((a,b)=>b[1].n-a[1].n||b[1].v-a[1].v).slice(0,8);
-  const pessoas=tipo=>{const o={};rows.filter(r=>r.Causador===tipo).forEach(r=>{const k=r.Matricula_Causador||r.Nome_Causador;const x=o[k]=o[k]||{n:r.Nome_Causador||k,i:0,v:0};x.i++;x.v+=r._v;});return Object.values(o).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,7);};
+  const pessoas=tipo=>{const o={};rows.filter(r=>r.Causador===tipo).forEach(r=>{const p=causadorDe(r),k=p.m||p.n;const x=o[k]=o[k]||{n:p.n||k,i:0,v:0};x.i++;x.v+=r._v;});return Object.values(o).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,7);};
   const seps=pessoas("Separador"),confs=pessoas("Conferente");
   const audA={};rows.forEach(r=>{const k=r.Nome_Auditor||"—";const x=audA[k]=audA[k]||{os:new Set(),i:0};x.os.add(r.Numero_OS);x.i++;});
   const porD={};todas.forEach(r=>{const k=fxDiaKey(r.ts);const x=porD[k]=porD[k]||{ts:r.ts,n:0};x.n++;});
@@ -1059,8 +1063,8 @@ function fxSetores(){const tit="Não conformidades por setor — Fechamento";con
   const ruasA=fxRows(FECH.dados&&FECH.dados.ruas).filter(r=>pbool(r.Possui_NC)),retA=fxRows(FECH.dados&&FECH.dados.retorno).filter(r=>pbool(r.Possui_NC)),carA=fxRows(FECH.dados&&FECH.dados.cargas),aerA=fxRows(FECH.dados&&FECH.dados.aero),s8=sobrasRows().filter(o=>o.tipo==="Sobra"),sobA=s8;
   const def=[{k:"rep",l:"Reposição — ruas",cur:"Repos. ruas",c:"#16A34A",rows:ruasA,val:r=>pnum(r.Valor_Divergencia),pes:r=>r.Nome_Colaborador_NC},
     {k:"ret",l:"Reposição — retorno",cur:"Repos. retorno",c:"#0E7490",rows:retA,val:r=>Math.abs(pnum(r.Valor_Divergencia)),pes:r=>r.Nome_Colaborador_NC},
-    {k:"conf",l:"Cargas — conferência",cur:"Conferência",c:"#0EA5E9",rows:carA.filter(r=>r.Causador!=="Separador"),val:r=>pnum(r.Valor_Total),pes:r=>r.Nome_Causador||r.Nome_Conferente},
-    {k:"sep",l:"Separação — cargas + sobras 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Nome_Causador||r.sep},
+    {k:"conf",l:"Cargas — conferência",cur:"Conferência",c:"#0EA5E9",rows:carA.filter(r=>r.Causador!=="Separador"),val:r=>pnum(r.Valor_Total),pes:r=>causadorDe(r).n},
+    {k:"sep",l:"Separação — cargas + sobras 8074",cur:"Separação",c:"#7C3AED",rows:carA.filter(r=>r.Causador==="Separador").concat(sobA),val:r=>r.Codigo_Produto!==undefined?pnum(r.Valor_Total):r.v,pes:r=>r.Codigo_Produto!==undefined?causadorDe(r).n:r.sep},
     {k:"aer",l:"Aéreo — operador",cur:"Aéreo",c:"#DC2626",rows:aerA,val:r=>pnum(r["Vlr. Total"]),pes:r=>r.Operador}];
   const S=def.map(d=>{const cur=d.rows.filter(r=>r.ts>=de&&r.ts<ate),ant=d.rows.filter(r=>r.ts>=pde&&r.ts<de);const v=cur.reduce((a,r)=>a+d.val(r),0);
     const p={};cur.forEach(r=>{const n=d.pes(r);if(n)p[n]=(p[n]||0)+1;});const topP=Object.entries(p).sort((a,b)=>b[1]-a[1])[0];
