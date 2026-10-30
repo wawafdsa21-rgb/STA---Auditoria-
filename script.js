@@ -746,7 +746,7 @@ function fxFoot(tit){return '<div class="fx-f"><span>'+esc(tit)+' · Ciclo: '+fd
 function porDia(rows,fn){const m={};rows.forEach(r=>{const k=fxDiaKey(r.ts);(m[k]=m[k]||{ts:r.ts,rows:[]}).rows.push(r);});return Object.keys(m).sort().slice(-14).map(k=>fn(m[k]));}
 
 /* ---- gráfico de linha ---- */
-function fxLine(pts,cor,unid){if(!pts.length)return '<p class="fx-e">Sem dados.</p>';const W=1040,H=170,pl=34,pr=10,pt=18,pb=26,mx=Math.max(...pts.map(p=>p.v),1);
+function fxLine(pts,cor,unid,HH){if(!pts.length)return '<p class="fx-e">Sem dados.</p>';const W=1040,H=HH||170,pl=34,pr=10,pt=18,pb=26,mx=Math.max(...pts.map(p=>p.v),1);
   const x=i=>pl+(pts.length===1?(W-pl-pr)/2:i*(W-pl-pr)/(pts.length-1)),y=v=>pt+(1-v/mx)*(H-pt-pb);
   const grid=[0,.5,1].map(g=>'<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+y(mx*g)+'" y2="'+y(mx*g)+'" stroke="#E2E8F0"/><text x="'+(pl-5)+'" y="'+(y(mx*g)+3)+'" font-size="9" text-anchor="end" fill="#64748B">'+(unid==="%"?Math.round(mx*g*100)+"%":Math.round(mx*g))+'</text>').join("");
   const path=pts.map((p,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(p.v).toFixed(1)).join(" ");const area=path+" L"+x(pts.length-1).toFixed(1)+" "+(H-pb)+" L"+x(0).toFixed(1)+" "+(H-pb)+" Z";
@@ -814,7 +814,7 @@ function fxRet(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.retorno).filter(r
 /* ---- Cargas ---- */
 function fxCar(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.cargas).map(r=>Object.assign(r,{_q:pnum(r.Quantidade),_v:pnum(r.Valor_Total)})),tit="Auditoria de Cargas — Fechamento";
   const todas=fxRows(FECH.dados&&FECH.dados.cargas);
-  const MOT=[["Falta","#EF4444"],["Avaria","#F97316"],["Abastecimento","#6366F1"],["Sobras","#CA8A04"]];
+  const MOT=[["Falta","#EF4444"],["Avaria","#F97316"],["Abastecimento","#6366F1"],["Sobras","#CA8A04"],["Produto trocado","#DB2777"]];
   const m={};MOT.forEach(([k])=>m[k]={n:0,q:0,v:0});rows.forEach(r=>{const x=m[r.Motivo];if(x){x.n++;x.q+=r._q;x.v+=r._v;}});
   const oss=new Set(rows.map(r=>r.Numero_OS)),tot=rows.reduce((a,r)=>a+r._v,0),pct=v=>tot?" · "+Math.round(v/tot*100)+"% do valor":"";
   const itens={};rows.forEach(r=>{const k=r.Codigo_Produto;const x=itens[k]=itens[k]||{d:r.Descricao_Produto,n:0,q:0,v:0,mot:{}};x.n++;x.q+=r._q;x.v+=r._v;x.mot[r.Motivo]=(x.mot[r.Motivo]||0)+1;});
@@ -828,7 +828,7 @@ function fxCar(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.cargas).map(r=>Ob
     fxKpis([{t:"O.S. auditadas",v:oss.size,s:(oss.size?(rows.length/oss.size).toFixed(1).replace(".",","):"0")+" ocorr. por O.S."},{t:"Ocorrências",v:rows.length,c:"#DC2626",s:rows.reduce((a,r)=>a+r._q,0)+" unidades"},
       {t:"Valor total",v:BRL0(tot),c:"#B45309",s:"média "+BRL0(oss.size?tot/oss.size:0)+" por O.S."},
       {t:"Faltas",v:BRL0(m.Falta.v),c:"#DC2626",s:m.Falta.n+" ocorr. · "+m.Falta.q+" un"+pct(m.Falta.v)},{t:"Avarias",v:BRL0(m.Avaria.v),c:"#EA580C",s:m.Avaria.n+" ocorr. · "+m.Avaria.q+" un"+pct(m.Avaria.v)},
-      {t:"Abastecimento",v:BRL0(m.Abastecimento.v),c:"#4F46E5",s:m.Abastecimento.n+" ocorr. · "+m.Abastecimento.q+" un"+pct(m.Abastecimento.v)},{t:"Sobras",v:BRL0(m.Sobras.v),c:"#CA8A04",s:m.Sobras.n+" ocorr. · "+m.Sobras.q+" un"+pct(m.Sobras.v)}],true)+
+      {t:"Abastecimento",v:BRL0(m.Abastecimento.v),c:"#4F46E5",s:m.Abastecimento.n+" ocorr. · "+m.Abastecimento.q+" un"+pct(m.Abastecimento.v)},{t:"Sobras",v:BRL0(m.Sobras.v),c:"#CA8A04",s:m.Sobras.n+" ocorr. · "+m.Sobras.q+" un"+pct(m.Sobras.v)},{t:"Produto trocado",v:BRL0(m["Produto trocado"].v),c:"#DB2777",s:m["Produto trocado"].n+" ocorr. · "+m["Produto trocado"].q+" un"+pct(m["Produto trocado"].v)}],true)+
     '<div class="fx-g"><div class="fx-col">'+fxCard("Itens que mais dão divergência",fxTable([{t:"#"},{t:"Item"},{t:"Motivos"},{t:"Ocorr.",n:1},{t:"Un",n:1},{t:"Valor",n:1}],
         rankItens.map(([k,x],i)=>[i+1,esc(k+" – "+String(x.d||"").slice(0,28)),esc(Object.entries(x.mot).map(([mm,n])=>mm+(n>1?" ("+n+")":"")).join(", ")),'<b>'+x.n+'</b>',x.q,BRL0(x.v)])))+
       '<div class="fx-g2">'+fxCard("Separadores com mais ocorrências",fxBars(seps.map(x=>({l:curto(x.n),v:x.i,txt:x.i+" · "+BRL0(x.v),c:"#7C3AED"}))))+
@@ -1034,11 +1034,14 @@ function fxAero(){const rows=fxNoPeriodo(FECH.dados&&FECH.dados.aero).map(r=>Obj
     fxKpis([{t:"Não conformidades",v:rows.length,c:"#DC2626",s:Object.keys(porD).length+" dia"+(Object.keys(porD).length===1?"":"s")+" com NC"},{t:"Operadores com NC",v:nOp,c:"#0F172A",s:nOp?(rows.length/nOp).toFixed(1).replace(".",",")+" NC por operador":""},
       {t:"O.S. auditadas",v:new Set(rows.map(r=>r["O.S"])).size},{t:"Valor médio por NC",v:BRL0(rows.length?tot/rows.length:0),c:"#B45309",s:maior?"maior: "+BRL0(maior._v)+" · "+curto(maior.Operador||""):""},
       {t:"Valor total",v:BRL0(tot),c:"#B45309",s:opTop?"mais NCs: "+curto(opTop.n)+" ("+opTop.i+")":""}],true)+
-    '<div class="fx-g" style="margin-top:10px"><div class="fx-col">'+fxCard("Auditorias por operador (quantidade de NCs)",fxCols(Object.values(ops).sort((a,b)=>b.i-a.i).slice(0,10).map(x=>({l:curto(x.n),v:x.i,txt:String(x.i),c:"#DC2626"}))))+
-      fxCard("Itens com mais ocorrências",fxTable([{t:"Código"},{t:"Descrição"},{t:"Ocorr.",n:1},{t:"Un",n:1},{t:"Valor",n:1}],Object.entries(itens).sort((a,b)=>b[1].i-a[1].i||b[1].v-a[1].v).slice(0,6).map(([k,x])=>[esc(k),esc(String(x.d||"").slice(0,30)),x.i,x.q,BRL0(x.v)])))+'</div>'+
-    '<div class="fx-col">'+fxCard("Ruas com mais ocorrências",fxCols(Object.entries(ruas).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({l:"Rua "+k,v,txt:String(v),c:"#0EA5E9"}))).replace('height:140px','height:120px'))+
-      '<div class="fx-g2">'+fxCard("Tipo de O.S.",fxDonut(Object.entries(tipos).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>({l:"Tipo "+k,v,c:cores[i%cores.length]}))))+
-      fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))))+'</div></div></div>'+fxFull("Lançamentos de não conformidade por dia (somente dias com auditoria)",fxLine(linha,"#DC2626"))+fxFoot("Auditoria Aéreo");}
+    '<div class="fx-row" style="grid-template-columns:1fr 1fr">'+
+      fxCard("NCs por operador",fxBars(Object.values(ops).sort((a,b)=>b.i-a.i||b.v-a.v).slice(0,8).map(x=>({l:curto(x.n),v:x.i,txt:x.i+" NC · "+BRL0(x.v),c:"#DC2626"}))).replace(/class="fx-bars"/,'class="fx-bars fx-bars-w"'))+
+      fxCard("Ruas com mais ocorrências",fxBars(Object.entries(ruas).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>({l:"Rua "+k,v,txt:v+" NC",c:"#0EA5E9"}))))+'</div>'+
+    '<div class="fx-row" style="grid-template-columns:1.7fr 1fr 1fr">'+
+      fxCard("Itens com mais ocorrências",fxTable([{t:"Código"},{t:"Descrição"},{t:"Ocorr.",n:1},{t:"Un",n:1},{t:"Valor",n:1}],Object.entries(itens).sort((a,b)=>b[1].i-a[1].i||b[1].v-a[1].v).slice(0,6).map(([k,x])=>[esc(k),esc(String(x.d||"").slice(0,28)),x.i,x.q,BRL0(x.v)])))+
+      fxCard("Tipo de O.S.",fxDonut(Object.entries(tipos).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>({l:"Tipo "+k,v,c:cores[i%cores.length]}))))+
+      fxCard("Auditores — lançamentos",fxBars(Object.entries(aud).sort((a,b)=>b[1]-a[1]).map(([n,v])=>({l:curto(n),v,txt:String(v),c:"#3B82F6"}))).replace(/class="fx-bars"/,'class="fx-bars fx-bars-s"'))+'</div>'+
+    fxFull("Lançamentos de não conformidade por dia (somente dias com auditoria)",fxLine(linha,"#DC2626",null,130))+fxFoot("Auditoria Aéreo");}
 
 /* ---- Setores ---- */
 function sobrasRows(){const src=(FECH.dados&&Array.isArray(FECH.dados.sobras)&&FECH.dados.sobras.length)?FECH.dados.sobras:SOBRAS;
